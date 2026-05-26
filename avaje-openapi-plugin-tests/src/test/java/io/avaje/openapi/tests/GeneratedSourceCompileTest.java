@@ -8,6 +8,7 @@ import io.avaje.openapi.generator.OpenApiGenerator;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Collectors;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,7 +38,7 @@ class GeneratedSourceCompileTest {
     assertThat(compiler).describedAs("JDK compiler").isNotNull();
     try (var files = Files.walk(sourceDir);
          var fileManager = compiler.getStandardFileManager(null, null, null)) {
-      var sources = files.filter(path -> path.toString().endsWith(".java")).toList();
+      var sources = files.filter(path -> path.toString().endsWith(".java")).collect(Collectors.toList());
       var units = fileManager.getJavaFileObjectsFromPaths(sources);
       var options = java.util.List.of(
         "--release", "21",

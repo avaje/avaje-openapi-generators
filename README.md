@@ -28,6 +28,8 @@ The generated API interfaces are then consumed by the existing Avaje annotation 
 
 ## Build
 
+The published generator modules target Java 11. The sample module overrides the compiler release to Java 21 because it compiles generated DTO records together with the Nima/Helidon sample server.
+
 ```bash
 mvn clean verify
 ```
@@ -93,6 +95,16 @@ target/generated-sources/avaje-openapi
 ```
 
 The plugin adds that directory to Maven compile source roots.
+
+## Java version
+
+The generator itself is intended to run on Java 11+:
+
+- `avaje-openapi-generator-core`
+- `avaje-openapi-maven-plugin`
+- `avaje-openapi-plugin-tests`
+
+Generated DTO models currently use Java records, so projects that compile the generated model source need a Java version with record support. Use Java 17+ as the practical baseline for generated DTO projects. The `avaje-openapi-sample` module uses Java 21 because it demonstrates the Nima/Helidon server target.
 
 ## Record builder DTOs
 

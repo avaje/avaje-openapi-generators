@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Generates Avaje HTTP API contracts and models from an OpenAPI specification. */
 public final class OpenApiGenerator {
@@ -180,8 +181,10 @@ public final class OpenApiGenerator {
     var apis = new ArrayList<ApiDef>();
     for (var entry : grouped.entrySet()) {
       var operations = entry.getValue();
-      var prefix = commonLiteralPrefix(operations.stream().map(OperationDef::fullPath).toList());
-      var adjusted = operations.stream().map(op -> op.withMethodPath(trimPrefix(op.fullPath(), prefix))).toList();
+      var prefix = commonLiteralPrefix(operations.stream().map(OperationDef::fullPath).collect(Collectors.toList()));
+      var adjusted = operations.stream()
+        .map(op -> op.withMethodPath(trimPrefix(op.fullPath(), prefix)))
+        .collect(Collectors.toList());
       apis.add(new ApiDef(apiName(entry.getKey()), prefix, adjusted));
     }
     apis.sort(Comparator.comparing(ApiDef::name));
@@ -247,16 +250,25 @@ public final class OpenApiGenerator {
     var name = requireNonNull(parameter.getName(), "parameter.name");
     var type = context.javaType(parameter.getSchema());
     var javaName = variableName(name);
-    var annotation = switch (in) {
-      case "path" -> null;
-      case "query" -> "@QueryParam(\"" + escape(name) + "\")";
-      case "header" -> "@Header(\"" + escape(name) + "\")";
-      case "cookie" -> "@Cookie(\"" + escape(name) + "\")";
-      default -> {
+    String annotation;
+    switch (in) {
+      case "path":
+        annotation = null;
+        break;
+      case "query":
+        annotation = "@QueryParam(\"" + escape(name) + "\")";
+        break;
+      case "header":
+        annotation = "@Header(\"" + escape(name) + "\")";
+        break;
+      case "cookie":
+        annotation = "@Cookie(\"" + escape(name) + "\")";
+        break;
+      default:
         context.unsupported("Unsupported parameter location '" + in + "' for parameter " + name);
-        yield null;
-      }
-    };
+        annotation = null;
+        break;
+    }
     return new ParamDef(javaName, annotation, type);
   }
 
@@ -342,9 +354,10 @@ public final class OpenApiGenerator {
 
   private static void writeModels(List<SchemaDef> schemas, Context context, List<GeneratedFile> generated) {
     for (var schema : schemas) {
-      switch (schema) {
-        case ObjectDef objectDef -> writeObject(objectDef, context, generated);
-        case EnumDef enumDef -> writeEnum(enumDef, context, generated);
+      if (schema instanceof ObjectDef) {
+        writeObject((ObjectDef) schema, context, generated);
+      } else if (schema instanceof EnumDef) {
+        writeEnum((EnumDef) schema, context, generated);
       }
     }
   }
@@ -518,14 +531,20 @@ public final class OpenApiGenerator {
   }
 
   private static String methodAnnotation(String httpMethod) {
-    return switch (httpMethod) {
-      case "GET" -> "Get";
-      case "POST" -> "Post";
-      case "PUT" -> "Put";
-      case "PATCH" -> "Patch";
-      case "DELETE" -> "Delete";
-      default -> throw new IllegalArgumentException("Unsupported method " + httpMethod);
-    };
+    switch (httpMethod) {
+      case "GET":
+        return "Get";
+      case "POST":
+        return "Post";
+      case "PUT":
+        return "Put";
+      case "PATCH":
+        return "Patch";
+      case "DELETE":
+        return "Delete";
+      default:
+        throw new IllegalArgumentException("Unsupported method " + httpMethod);
+    }
   }
 
   private static int defaultStatus(String httpMethod, String returnType) {
@@ -553,7 +572,15 @@ public final class OpenApiGenerator {
     return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 
-  private record Context(GeneratorConfig config, List<Diagnostic> diagnostics) {
+  private static final class Context {
+
+    private final GeneratorConfig config;
+    private final List<Diagnostic> diagnostics;
+
+    private Context(GeneratorConfig config, List<Diagnostic> diagnostics) {
+      this.config = config;
+      this.diagnostics = diagnostics;
+    }
 
     JavaType javaType(Schema<?> schema) {
       if (schema == null) {
@@ -567,7 +594,8 @@ public final class OpenApiGenerator {
         var itemType = javaType(schema.getItems());
         return JavaType.generic("List", "java.util.List", itemType);
       }
-      if (schema.getAdditionalProperties() instanceof Schema<?> additional) {
+      if (schema.getAdditionalProperties() instanceof Schema<?>) {
+        var additional = (Schema<?>) schema.getAdditionalProperties();
         return JavaType.map(javaType(additional));
       }
       if (Boolean.TRUE.equals(schema.getAdditionalProperties())) {
@@ -577,24 +605,34 @@ public final class OpenApiGenerator {
         unsupported("Composed inline schema is not supported yet");
         return JavaType.simple("Object");
       }
-      return switch (Optional.ofNullable(schema.getType()).orElse("object")) {
-        case "string" -> stringType(schema.getFormat());
-        case "integer" -> integerType(schema.getFormat());
-        case "number" -> numberType(schema.getFormat());
-        case "boolean" -> JavaType.simple("Boolean");
-        case "object" -> JavaType.simple("Object");
-        default -> JavaType.simple("Object");
-      };
+      switch (Optional.ofNullable(schema.getType()).orElse("object")) {
+        case "string":
+          return stringType(schema.getFormat());
+        case "integer":
+          return integerType(schema.getFormat());
+        case "number":
+          return numberType(schema.getFormat());
+        case "boolean":
+          return JavaType.simple("Boolean");
+        case "object":
+        default:
+          return JavaType.simple("Object");
+      }
     }
 
     private JavaType stringType(String format) {
-      return switch (Optional.ofNullable(format).orElse("")) {
-        case "date" -> JavaType.of("LocalDate", LocalDate.class.getName());
-        case "date-time" -> JavaType.of("Instant", Instant.class.getName());
-        case "uuid" -> JavaType.of("UUID", UUID.class.getName());
-        case "binary" -> JavaType.simple("byte[]");
-        default -> JavaType.simple("String");
-      };
+      switch (Optional.ofNullable(format).orElse("")) {
+        case "date":
+          return JavaType.of("LocalDate", LocalDate.class.getName());
+        case "date-time":
+          return JavaType.of("Instant", Instant.class.getName());
+        case "uuid":
+          return JavaType.of("UUID", UUID.class.getName());
+        case "binary":
+          return JavaType.simple("byte[]");
+        default:
+          return JavaType.simple("String");
+      }
     }
 
     private JavaType integerType(String format) {
@@ -602,11 +640,14 @@ public final class OpenApiGenerator {
     }
 
     private JavaType numberType(String format) {
-      return switch (Optional.ofNullable(format).orElse("")) {
-        case "float" -> JavaType.simple("Float");
-        case "double" -> JavaType.simple("Double");
-        default -> JavaType.of("BigDecimal", BigDecimal.class.getName());
-      };
+      switch (Optional.ofNullable(format).orElse("")) {
+        case "float":
+          return JavaType.simple("Float");
+        case "double":
+          return JavaType.simple("Double");
+        default:
+          return JavaType.of("BigDecimal", BigDecimal.class.getName());
+      }
     }
 
     void unsupported(String message) {
@@ -656,35 +697,194 @@ public final class OpenApiGenerator {
     }
   }
 
-  private sealed interface SchemaDef permits ObjectDef, EnumDef {
+  private interface SchemaDef {
     String name();
   }
 
-  private record ObjectDef(String name, List<FieldDef> fields) implements SchemaDef {
+  private static final class ObjectDef implements SchemaDef {
+    private final String name;
+    private final List<FieldDef> fields;
+
+    private ObjectDef(String name, List<FieldDef> fields) {
+      this.name = name;
+      this.fields = List.copyOf(fields);
+    }
+
+    @Override
+    public String name() {
+      return name;
+    }
+
+    List<FieldDef> fields() {
+      return fields;
+    }
   }
 
-  private record FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints) {
+  private static final class FieldDef {
+    private final String javaName;
+    private final String jsonName;
+    private final JavaType type;
+    private final boolean required;
+    private final List<String> constraints;
+
+    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints) {
+      this.javaName = javaName;
+      this.jsonName = jsonName;
+      this.type = type;
+      this.required = required;
+      this.constraints = List.copyOf(constraints);
+    }
+
+    String javaName() {
+      return javaName;
+    }
+
+    String jsonName() {
+      return jsonName;
+    }
+
+    JavaType type() {
+      return type;
+    }
+
+    boolean required() {
+      return required;
+    }
+
+    List<String> constraints() {
+      return constraints;
+    }
   }
 
-  private record EnumDef(String name, List<EnumValue> values) implements SchemaDef {
+  private static final class EnumDef implements SchemaDef {
+    private final String name;
+    private final List<EnumValue> values;
+
+    private EnumDef(String name, List<EnumValue> values) {
+      this.name = name;
+      this.values = List.copyOf(values);
+    }
+
+    @Override
+    public String name() {
+      return name;
+    }
+
+    List<EnumValue> values() {
+      return values;
+    }
   }
 
-  private record EnumValue(String constant, String value) {
+  private static final class EnumValue {
+    private final String constant;
+    private final String value;
+
+    private EnumValue(String constant, String value) {
+      this.constant = constant;
+      this.value = value;
+    }
+
+    String constant() {
+      return constant;
+    }
+
+    String value() {
+      return value;
+    }
   }
 
-  private record ApiDef(String name, String pathPrefix, List<OperationDef> operations) {
+  private static final class ApiDef {
+    private final String name;
+    private final String pathPrefix;
+    private final List<OperationDef> operations;
+
+    private ApiDef(String name, String pathPrefix, List<OperationDef> operations) {
+      this.name = name;
+      this.pathPrefix = pathPrefix;
+      this.operations = List.copyOf(operations);
+    }
+
+    String name() {
+      return name;
+    }
+
+    String pathPrefix() {
+      return pathPrefix;
+    }
+
+    List<OperationDef> operations() {
+      return operations;
+    }
   }
 
-  private record OperationDef(
-    String httpMethod,
-    String fullPath,
-    String methodPath,
-    String methodName,
-    List<ParamDef> parameters,
-    JavaType returnType,
-    int statusCode,
-    String responseMediaType,
-    String requestMediaType) {
+  private static final class OperationDef {
+    private final String httpMethod;
+    private final String fullPath;
+    private final String methodPath;
+    private final String methodName;
+    private final List<ParamDef> parameters;
+    private final JavaType returnType;
+    private final int statusCode;
+    private final String responseMediaType;
+    private final String requestMediaType;
+
+    private OperationDef(
+      String httpMethod,
+      String fullPath,
+      String methodPath,
+      String methodName,
+      List<ParamDef> parameters,
+      JavaType returnType,
+      int statusCode,
+      String responseMediaType,
+      String requestMediaType) {
+
+      this.httpMethod = httpMethod;
+      this.fullPath = fullPath;
+      this.methodPath = methodPath;
+      this.methodName = methodName;
+      this.parameters = List.copyOf(parameters);
+      this.returnType = returnType;
+      this.statusCode = statusCode;
+      this.responseMediaType = responseMediaType;
+      this.requestMediaType = requestMediaType;
+    }
+
+    String httpMethod() {
+      return httpMethod;
+    }
+
+    String fullPath() {
+      return fullPath;
+    }
+
+    String methodPath() {
+      return methodPath;
+    }
+
+    String methodName() {
+      return methodName;
+    }
+
+    List<ParamDef> parameters() {
+      return parameters;
+    }
+
+    JavaType returnType() {
+      return returnType;
+    }
+
+    int statusCode() {
+      return statusCode;
+    }
+
+    String responseMediaType() {
+      return responseMediaType;
+    }
+
+    String requestMediaType() {
+      return requestMediaType;
+    }
 
     OperationDef withMethodPath(String methodPath) {
       return new OperationDef(
@@ -700,16 +900,80 @@ public final class OpenApiGenerator {
     }
   }
 
-  private record ParamDef(String name, String annotation, JavaType type) {
+  private static final class ParamDef {
+    private final String name;
+    private final String annotation;
+    private final JavaType type;
+
+    private ParamDef(String name, String annotation, JavaType type) {
+      this.name = name;
+      this.annotation = annotation;
+      this.type = type;
+    }
+
+    String name() {
+      return name;
+    }
+
+    String annotation() {
+      return annotation;
+    }
+
+    JavaType type() {
+      return type;
+    }
   }
 
-  private record ResponseDef(JavaType type, int statusCode, String mediaType) {
+  private static final class ResponseDef {
+    private final JavaType type;
+    private final int statusCode;
+    private final String mediaType;
+
+    private ResponseDef(JavaType type, int statusCode, String mediaType) {
+      this.type = type;
+      this.statusCode = statusCode;
+      this.mediaType = mediaType;
+    }
+
+    JavaType type() {
+      return type;
+    }
+
+    int statusCode() {
+      return statusCode;
+    }
+
+    String mediaType() {
+      return mediaType;
+    }
   }
 
-  private record SelectedMedia(String name, MediaType mediaType) {
+  private static final class SelectedMedia {
+    private final String name;
+    private final MediaType mediaType;
+
+    private SelectedMedia(String name, MediaType mediaType) {
+      this.name = name;
+      this.mediaType = mediaType;
+    }
+
+    String name() {
+      return name;
+    }
+
+    MediaType mediaType() {
+      return mediaType;
+    }
   }
 
-  private record JavaType(String code, Set<String> imports) {
+  private static final class JavaType {
+    private final String code;
+    private final Set<String> imports;
+
+    private JavaType(String code, Set<String> imports) {
+      this.code = code;
+      this.imports = Set.copyOf(imports);
+    }
 
     static JavaType simple(String code) {
       return new JavaType(code, Set.of());
@@ -731,6 +995,14 @@ public final class OpenApiGenerator {
       imports.add(Map.class.getName());
       imports.addAll(valueType.imports());
       return new JavaType("Map<String, " + valueType.code() + ">", imports);
+    }
+
+    String code() {
+      return code;
+    }
+
+    Set<String> imports() {
+      return imports;
     }
   }
 }

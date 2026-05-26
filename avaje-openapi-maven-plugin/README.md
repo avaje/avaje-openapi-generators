@@ -4,6 +4,8 @@ The Maven plugin exposes the `avaje-openapi:generate` goal. It runs in the `gene
 
 For server generation, the plugin emits `io.avaje.http.api` interfaces rather than Nima-specific source. The same generated contract can be consumed by any compatible Avaje HTTP server target, including Avaje Nima/Helidon, Avaje Jex, and Javalin via `avaje-http-javalin-generator`.
 
+The plugin artifact targets Java 11. Generated DTO records require a Java version with record support; use Java 17+ as the practical baseline for projects compiling generated models.
+
 ## Basic usage
 
 ```xml

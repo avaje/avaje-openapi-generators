@@ -130,12 +130,12 @@ public final class NameUtils {
     if (words.isEmpty()) {
       return "";
     }
-    var out = new StringBuilder(words.getFirst().toLowerCase(Locale.ROOT));
+    var out = new StringBuilder(words.get(0).toLowerCase(Locale.ROOT));
     for (var i = 1; i < words.size(); i++) {
       var word = words.get(i).toLowerCase(Locale.ROOT);
       out.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
     }
-    if (!out.isEmpty() && !Character.isJavaIdentifierStart(out.charAt(0))) {
+    if (out.length() > 0 && !Character.isJavaIdentifierStart(out.charAt(0))) {
       out.insert(0, "value");
     }
     return out.toString();

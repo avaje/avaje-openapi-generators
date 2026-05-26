@@ -5,29 +5,91 @@ import static java.util.Objects.requireNonNull;
 import java.nio.file.Path;
 
 /** Configuration for OpenAPI to Avaje Java source generation. */
-public record GeneratorConfig(
-  Path inputSpec,
-  Path outputDirectory,
-  String apiPackage,
-  String modelPackage,
-  GenerationMode mode,
-  boolean validationAnnotations,
-  ValidationStyle validationStyle,
-  boolean jsonAnnotations,
-  boolean recordBuilder,
-  boolean clientAnnotations,
-  boolean failOnUnsupported) {
+public final class GeneratorConfig {
 
-  public GeneratorConfig {
-    requireNonNull(inputSpec, "inputSpec");
-    requireNonNull(outputDirectory, "outputDirectory");
-    requireNonNull(apiPackage, "apiPackage");
-    if (apiPackage.isBlank()) {
+  private final Path inputSpec;
+  private final Path outputDirectory;
+  private final String apiPackage;
+  private final String modelPackage;
+  private final GenerationMode mode;
+  private final boolean validationAnnotations;
+  private final ValidationStyle validationStyle;
+  private final boolean jsonAnnotations;
+  private final boolean recordBuilder;
+  private final boolean clientAnnotations;
+  private final boolean failOnUnsupported;
+
+  public GeneratorConfig(
+    Path inputSpec,
+    Path outputDirectory,
+    String apiPackage,
+    String modelPackage,
+    GenerationMode mode,
+    boolean validationAnnotations,
+    ValidationStyle validationStyle,
+    boolean jsonAnnotations,
+    boolean recordBuilder,
+    boolean clientAnnotations,
+    boolean failOnUnsupported) {
+
+    this.inputSpec = requireNonNull(inputSpec, "inputSpec");
+    this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory");
+    this.apiPackage = requireNonNull(apiPackage, "apiPackage");
+    if (this.apiPackage.isBlank()) {
       throw new IllegalArgumentException("apiPackage must not be blank");
     }
-    modelPackage = modelPackage == null || modelPackage.isBlank() ? apiPackage + ".model" : modelPackage;
-    mode = mode == null ? GenerationMode.CONTRACT : mode;
-    validationStyle = validationStyle == null ? ValidationStyle.JAKARTA : validationStyle;
+    this.modelPackage = modelPackage == null || modelPackage.isBlank() ? apiPackage + ".model" : modelPackage;
+    this.mode = mode == null ? GenerationMode.CONTRACT : mode;
+    this.validationAnnotations = validationAnnotations;
+    this.validationStyle = validationStyle == null ? ValidationStyle.JAKARTA : validationStyle;
+    this.jsonAnnotations = jsonAnnotations;
+    this.recordBuilder = recordBuilder;
+    this.clientAnnotations = clientAnnotations;
+    this.failOnUnsupported = failOnUnsupported;
+  }
+
+  public Path inputSpec() {
+    return inputSpec;
+  }
+
+  public Path outputDirectory() {
+    return outputDirectory;
+  }
+
+  public String apiPackage() {
+    return apiPackage;
+  }
+
+  public String modelPackage() {
+    return modelPackage;
+  }
+
+  public GenerationMode mode() {
+    return mode;
+  }
+
+  public boolean validationAnnotations() {
+    return validationAnnotations;
+  }
+
+  public ValidationStyle validationStyle() {
+    return validationStyle;
+  }
+
+  public boolean jsonAnnotations() {
+    return jsonAnnotations;
+  }
+
+  public boolean recordBuilder() {
+    return recordBuilder;
+  }
+
+  public boolean clientAnnotations() {
+    return clientAnnotations;
+  }
+
+  public boolean failOnUnsupported() {
+    return failOnUnsupported;
   }
 
   /** Return a builder with required values. */

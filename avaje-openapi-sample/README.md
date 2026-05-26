@@ -13,6 +13,8 @@ This sample chooses the Nima/Helidon server target. The generated contract sourc
 
 The sample sets `<validationStyle>AVAJE</validationStyle>`, so generated DTOs use `io.avaje.validation.constraints.*` rather than Jakarta validation constraints.
 
+The sample compiles with Java 21 because it demonstrates the Nima/Helidon server target. The generator artifacts themselves target Java 11, but generated DTOs currently use Java records and therefore need a newer Java release in consuming projects.
+
 ## Build
 
 From the repository root:

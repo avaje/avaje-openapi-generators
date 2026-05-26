@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.stream.Collectors;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -100,9 +101,15 @@ public final class GenerateMojo extends AbstractMojo {
     var result = new OpenApiGenerator().generate(config);
     for (var diagnostic : result.diagnostics()) {
       switch (diagnostic.severity()) {
-        case INFO -> getLog().info(diagnostic.message());
-        case WARN -> getLog().warn(diagnostic.message());
-        case ERROR -> getLog().error(diagnostic.message());
+        case INFO:
+          getLog().info(diagnostic.message());
+          break;
+        case WARN:
+          getLog().warn(diagnostic.message());
+          break;
+        case ERROR:
+          getLog().error(diagnostic.message());
+          break;
       }
     }
     for (var file : result.generatedFiles()) {
@@ -120,7 +127,7 @@ public final class GenerateMojo extends AbstractMojo {
       return;
     }
     try (var paths = Files.walk(outputPath)) {
-      var sorted = paths.sorted(Comparator.reverseOrder()).toList();
+      var sorted = paths.sorted(Comparator.reverseOrder()).collect(Collectors.toList());
       for (var path : sorted) {
         Files.delete(path);
       }

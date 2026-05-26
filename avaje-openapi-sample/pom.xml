@@ -13,6 +13,10 @@
   <artifactId>avaje-openapi-sample</artifactId>
   <name>avaje-openapi-sample</name>
 
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.avaje</groupId>
