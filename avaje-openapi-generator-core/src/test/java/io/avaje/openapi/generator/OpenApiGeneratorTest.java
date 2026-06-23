@@ -534,6 +534,43 @@ class OpenApiGeneratorTest {
       .doesNotContain("jakarta.validation");
   }
 
+  @Test
+  void readOnlyWriteOnlyAvajeStyle() throws Exception {
+    var input = resourcePath("openapi/readonly-writeonly.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/UserProfile.java"))
+      .content()
+      .contains("@Json")
+      .contains("import io.avaje.jsonb.Json;")
+      .contains("@Json.Ignore(deserialize = true) Long id")
+      .contains("@NotNull String username")
+      .contains("@Json.Ignore(serialize = true) String password")
+      .contains("@Nullable String email")
+      .doesNotContain("JsonProperty");
+  }
+
+  @Test
+  void readOnlyWriteOnlyJacksonStyle() throws Exception {
+    var input = resourcePath("openapi/readonly-writeonly.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .jsonStyle(JsonStyle.JACKSON)
+      .build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/UserProfile.java"))
+      .content()
+      .contains("import com.fasterxml.jackson.annotation.JsonProperty;")
+      .contains("@JsonProperty(access = JsonProperty.Access.READ_ONLY) Long id")
+      .contains("@NotNull String username")
+      .contains("@JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String password")
+      .contains("@Nullable String email")
+      .doesNotContain("@Json.Ignore");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }

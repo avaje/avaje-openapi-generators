@@ -16,6 +16,7 @@ public final class GeneratorConfig {
   private final boolean validationAnnotations;
   private final ValidationStyle validationStyle;
   private final boolean jsonAnnotations;
+  private final JsonStyle jsonStyle;
   private final boolean recordBuilder;
   private final boolean clientAnnotations;
   private final boolean failOnUnsupported;
@@ -35,6 +36,7 @@ public final class GeneratorConfig {
     boolean validationAnnotations,
     ValidationStyle validationStyle,
     boolean jsonAnnotations,
+    JsonStyle jsonStyle,
     boolean recordBuilder,
     boolean clientAnnotations,
     boolean failOnUnsupported,
@@ -56,6 +58,7 @@ public final class GeneratorConfig {
     this.validationAnnotations = validationAnnotations;
     this.validationStyle = validationStyle == null ? ValidationStyle.JAKARTA : validationStyle;
     this.jsonAnnotations = jsonAnnotations;
+    this.jsonStyle = jsonStyle == null ? JsonStyle.AVAJE : jsonStyle;
     this.recordBuilder = recordBuilder;
     this.clientAnnotations = clientAnnotations;
     this.failOnUnsupported = failOnUnsupported;
@@ -97,6 +100,14 @@ public final class GeneratorConfig {
 
   public boolean jsonAnnotations() {
     return jsonAnnotations;
+  }
+
+  /**
+   * JSON serialisation library whose annotations are emitted on {@code readOnly} and
+   * {@code writeOnly} model properties. Defaults to {@link JsonStyle#AVAJE}.
+   */
+  public JsonStyle jsonStyle() {
+    return jsonStyle;
   }
 
   public boolean recordBuilder() {
@@ -184,6 +195,7 @@ public final class GeneratorConfig {
     private boolean validationAnnotations = true;
     private ValidationStyle validationStyle = ValidationStyle.JAKARTA;
     private boolean jsonAnnotations = true;
+    private JsonStyle jsonStyle = JsonStyle.AVAJE;
     private boolean recordBuilder;
     private boolean clientAnnotations = true;
     private boolean failOnUnsupported = true;
@@ -222,6 +234,11 @@ public final class GeneratorConfig {
 
     public Builder jsonAnnotations(boolean jsonAnnotations) {
       this.jsonAnnotations = jsonAnnotations;
+      return this;
+    }
+
+    public Builder jsonStyle(JsonStyle jsonStyle) {
+      this.jsonStyle = jsonStyle;
       return this;
     }
 
@@ -280,6 +297,7 @@ public final class GeneratorConfig {
         validationAnnotations,
         validationStyle,
         jsonAnnotations,
+        jsonStyle,
         recordBuilder,
         clientAnnotations,
         failOnUnsupported,

@@ -301,7 +301,47 @@ References to enums and scalar types are not cascaded. Jakarta places `@Valid` i
 the root `jakarta.validation` package; the Avaje style uses
 `io.avaje.validation.constraints.Valid`.
 
-## Nullable annotations
+## readOnly and writeOnly fields
+
+Schema properties marked `readOnly: true` or `writeOnly: true` get a JSON
+annotation so the serialisation library enforces the constraint:
+
+| OpenAPI | Avaje Jsonb (`jsonStyle: AVAJE`, default) | Jackson (`jsonStyle: JACKSON`) |
+| --- | --- | --- |
+| `readOnly: true` | `@Json.Ignore(deserialize = true)` | `@JsonProperty(access = JsonProperty.Access.READ_ONLY)` |
+| `writeOnly: true` | `@Json.Ignore(serialize = true)` | `@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)` |
+
+The default style targets Avaje Jsonb:
+
+```java
+@Json
+public record UserProfile(
+  @Json.Ignore(deserialize = true) Long id,        // readOnly — in responses only
+  @NotNull String username,
+  @Json.Ignore(serialize = true) String password,  // writeOnly — in requests only
+  @Nullable String email
+) {}
+```
+
+To target Jackson instead, set `jsonStyle` in the plugin configuration:
+
+```xml
+<jsonStyle>JACKSON</jsonStyle>
+```
+
+```java
+public record UserProfile(
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY) Long id,
+  @NotNull String username,
+  @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String password,
+  @Nullable String email
+) {}
+```
+
+These annotations are only emitted when `generateJsonAnnotations` is `true`
+(the default).
+
+
 
 Optional parameters (`required: false`, without a `default`) and model fields
 declared `nullable: true` are annotated with `@Nullable`. The default annotation
@@ -517,6 +557,7 @@ Supported:
 - path/query/header/cookie parameters (with `@Default` for parameter defaults; annotation value omitted when it matches the parameter name)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 - validation constraints (`@NotNull`, `@Size`, `@Min`/`@Max`, `@DecimalMin`/`@DecimalMax`, `@Pattern`, `@Email`, `@Valid` cascade; Jakarta or Avaje style)
+- `readOnly`/`writeOnly` fields annotated for Avaje Jsonb (`@Json.Ignore`) or Jackson (`@JsonProperty`) via `jsonStyle` config
 - `allOf` composition (members are flattened/merged into a single record)
 - inline object/array/map schemas (extracted into named nested records)
 - `description`/`summary` rendered as Javadoc and `deprecated` as `@Deprecated` (schemas, enums, operations, fields, parameters)
