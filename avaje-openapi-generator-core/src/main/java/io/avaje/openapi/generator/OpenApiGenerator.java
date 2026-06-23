@@ -27,6 +27,7 @@ import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -192,16 +193,48 @@ public final class OpenApiGenerator {
       addOperation(grouped, context, "DELETE", path, item.getDelete(), pathParams);
     }
     var apis = new ArrayList<ApiDef>();
+    var serverBase = serverBasePath(openApi, context);
     for (var entry : grouped.entrySet()) {
       var operations = entry.getValue();
       var prefix = commonLiteralPrefix(operations.stream().map(OperationDef::fullPath).collect(Collectors.toList()));
       var adjusted = operations.stream()
         .map(op -> op.withMethodPath(trimPrefix(op.fullPath(), prefix)))
         .collect(Collectors.toList());
-      apis.add(new ApiDef(apiName(entry.getKey()), prefix, adjusted));
+      apis.add(new ApiDef(apiName(entry.getKey()), serverBase + prefix, adjusted));
     }
     apis.sort(Comparator.comparing(ApiDef::name));
     return apis;
+  }
+
+  /**
+   * The static path component of the first {@code servers} URL, used as the base of
+   * the interface {@code @Path}. Supports an absolute URL ({@code https://host/v1})
+   * or a relative path ({@code /v1}); a trailing slash is removed and a bare
+   * {@code /} yields no base path. Server URLs containing template variables (e.g.
+   * {@code https://{host}/v1}) cannot form a static prefix and are ignored with a
+   * diagnostic.
+   */
+  private static String serverBasePath(OpenAPI openApi, Context context) {
+    var servers = openApi.getServers();
+    if (servers == null || servers.isEmpty()) {
+      return "";
+    }
+    var url = servers.get(0).getUrl();
+    if (url == null || url.isBlank()) {
+      return "";
+    }
+    String path;
+    try {
+      path = URI.create(url).getPath();
+    } catch (IllegalArgumentException e) {
+      context.diagnostics.add(Diagnostic.warn(
+        "Ignoring servers url '" + url + "' for @Path: not a valid URI (server variables are not supported)"));
+      return "";
+    }
+    if (path == null || path.isBlank() || "/".equals(path)) {
+      return "";
+    }
+    return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
   }
 
   private static void addOperation(

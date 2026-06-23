@@ -183,6 +183,26 @@ class OpenApiGeneratorTest {
       .doesNotContain("default ");
   }
 
+  @Test
+  void serverBasePathBecomesInterfacePath() throws Exception {
+    var input = resourcePath("openapi/versioned.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/StoreApi.java"))
+      .content()
+      // path component of the servers URL drives @Path; the two resources share no
+      // literal prefix so the @Path is exactly the server base
+      .contains("@Path(\"/v1\")")
+      .contains("@Get(\"/pets/{id}\")")
+      .contains("@Get(\"/owners/{id}\")");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }
