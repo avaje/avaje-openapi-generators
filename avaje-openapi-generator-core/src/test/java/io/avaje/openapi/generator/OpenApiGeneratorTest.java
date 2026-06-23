@@ -390,6 +390,60 @@ class OpenApiGeneratorTest {
       .contains("@Header(\"X-Request-Id\") String xRequestId");
   }
 
+  @Test
+  void validationBreadthFromSpec() throws Exception {
+    var input = resourcePath("openapi/validation.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/model/Widget.java"))
+      .content()
+      // pattern
+      .contains("@Pattern(regexp = \"^[A-Z]{3}\\\\d+$\")")
+      // email format
+      .contains("@Email")
+      // inclusive decimal bounds
+      .contains("@DecimalMin(\"0.5\")")
+      .contains("@DecimalMax(\"99.99\")")
+      // exclusive bounds use DecimalMin/Max with inclusive = false
+      .contains("@DecimalMin(value = \"0\", inclusive = false)")
+      .contains("@DecimalMax(value = \"1\", inclusive = false)")
+      // whole inclusive bounds keep @Min/@Max
+      .contains("@Min(1)")
+      .contains("@Max(100)")
+      // array item bounds -> @Size
+      .contains("@Size(min = 1, max = 5)")
+      // imports (default Jakarta style)
+      .contains("import jakarta.validation.constraints.Pattern;")
+      .contains("import jakarta.validation.constraints.Email;")
+      .contains("import jakarta.validation.constraints.DecimalMin;")
+      .contains("import jakarta.validation.constraints.DecimalMax;")
+      .contains("import jakarta.validation.constraints.Size;");
+  }
+
+  @Test
+  void validationBreadthAvajeStyleImports() throws Exception {
+    var input = resourcePath("openapi/validation.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .validationStyle(ValidationStyle.AVAJE)
+      .build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/Widget.java"))
+      .content()
+      .contains("import io.avaje.validation.constraints.Pattern;")
+      .contains("import io.avaje.validation.constraints.Email;")
+      .contains("import io.avaje.validation.constraints.DecimalMin;")
+      .contains("import io.avaje.validation.constraints.DecimalMax;")
+      .doesNotContain("jakarta.validation.constraints");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }
