@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -448,7 +449,7 @@ class OpenApiGeneratorTest {
   void typeMappingsByFormatTypeAndPrecedence() throws Exception {
     var input = resourcePath("openapi/typemap.yaml");
     var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
-      .typeMappings(java.util.Map.of(
+      .typeMappings(Map.of(
         "uuid", "com.example.Identifier",
         "date-time", "java.time.Instant",
         "string", "com.example.Text"))

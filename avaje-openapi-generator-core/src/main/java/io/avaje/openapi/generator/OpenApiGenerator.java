@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** Generates Avaje HTTP API contracts and models from an OpenAPI specification. */
@@ -1042,7 +1043,7 @@ public final class OpenApiGenerator {
      * format, falling back to the built-in resolution. A {@code format} key (e.g.
      * {@code uuid}) takes precedence over a {@code type} key (e.g. {@code string}).
      */
-    private JavaType mappedType(String type, String format, java.util.function.Supplier<JavaType> fallback) {
+    private JavaType mappedType(String type, String format, Supplier<JavaType> fallback) {
       var mappings = config.typeMappings();
       if (!mappings.isEmpty()) {
         if (format != null && !format.isBlank() && mappings.containsKey(format)) {
