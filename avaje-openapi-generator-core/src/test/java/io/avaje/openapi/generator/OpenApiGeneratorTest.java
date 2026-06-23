@@ -256,6 +256,51 @@ class OpenApiGeneratorTest {
       .contains("Integer score");
   }
 
+  @Test
+  void javadocAndDeprecatedFromSpec() throws Exception {
+    var input = resourcePath("openapi/documented.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    // model: type description as Javadoc + @param per documented field
+    assertThat(tempDir.resolve("org/example/api/model/Widget.java"))
+      .content()
+      .contains("/**")
+      .contains(" * A widget that does widget things.")
+      .contains(" * @param id The unique widget identifier")
+      .contains(" * @param name A human readable widget name")
+      .contains("public record Widget(");
+
+    // model: schema-level deprecated -> @Deprecated annotation
+    assertThat(tempDir.resolve("org/example/api/model/OldWidget.java"))
+      .content()
+      .contains(" * Superseded by Widget.")
+      .contains("@Deprecated")
+      .contains("public record OldWidget(");
+
+    // enum: description as Javadoc
+    assertThat(tempDir.resolve("org/example/api/model/WidgetStatus.java"))
+      .content()
+      .contains(" * The lifecycle status of a widget.")
+      .contains("public enum WidgetStatus {");
+
+    // operation: summary + description Javadoc, @param and @return tags
+    assertThat(tempDir.resolve("org/example/api/WidgetsApi.java"))
+      .content()
+      .contains(" * Fetch a widget")
+      .contains(" * Returns a single widget by its identifier.")
+      .contains(" * @param id The widget identifier")
+      .contains(" * @return The requested widget")
+      // operation-level deprecated -> @Deprecated on the method
+      .contains("  @Deprecated")
+      .contains(" * List legacy widgets");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }
