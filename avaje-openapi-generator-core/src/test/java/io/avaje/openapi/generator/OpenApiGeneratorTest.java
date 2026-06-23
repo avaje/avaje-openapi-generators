@@ -32,10 +32,10 @@ class OpenApiGeneratorTest {
       .contains("@Path(\"/pets\")")
       .contains("@Get")
       .contains("@Post")
-      .contains("List<Pet> listPets(@Nullable @QueryParam(\"limit\") Integer limit, @Nullable @QueryParam(\"status\") PetStatus status)")
-      .contains("Stream<Pet> streamPets(@Nullable @QueryParam(\"status\") PetStatus status)")
+      .contains("List<Pet> listPets(@Nullable @QueryParam Integer limit, @Nullable @QueryParam PetStatus status)")
+      .contains("Stream<Pet> streamPets(@Nullable @QueryParam PetStatus status)")
       .contains("import java.util.stream.Stream;")
-      .contains("Pet getPet(Long id, @Nullable @Header(\"X-Request-Id\") String xRequestId, @QueryParam(\"useMaster\") @Default(\"false\") boolean useMaster)")
+      .contains("Pet getPet(Long id, @Nullable @Header(\"X-Request-Id\") String xRequestId, @QueryParam @Default(\"false\") boolean useMaster)")
       .contains("import io.avaje.http.api.Default;")
       .contains("import org.jspecify.annotations.Nullable;");
 
@@ -317,7 +317,7 @@ class OpenApiGeneratorTest {
     assertThat(tempDir.resolve("org/example/api/ThingsApi.java"))
       .content()
       .contains("import org.jspecify.annotations.Nullable;")
-      .contains("Thing getThing(Long id, @Nullable @QueryParam(\"filter\") String filter, @QueryParam(\"page\") Integer page)");
+      .contains("Thing getThing(Long id, @Nullable @QueryParam String filter, @QueryParam Integer page)");
 
     // model: nullable:true field -> @Nullable; required+nullable suppresses @NotNull
     assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
@@ -368,6 +368,26 @@ class OpenApiGeneratorTest {
       .contains("import jakarta.annotation.Nullable;")
       .contains("@Nullable String note")
       .doesNotContain("org.jspecify");
+  }
+
+  @Test
+  void omitsParamAnnotationValueWhenNameMatches() throws Exception {
+    var input = resourcePath("openapi/pets.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
+      .content()
+      // wire name matches the Java parameter name -> value omitted
+      .contains("@QueryParam Integer limit")
+      .contains("@QueryParam PetStatus status")
+      .contains("@QueryParam @Default(\"false\") boolean useMaster")
+      .doesNotContain("@QueryParam(\"limit\")")
+      .doesNotContain("@QueryParam(\"status\")")
+      .doesNotContain("@QueryParam(\"useMaster\")")
+      // wire name differs from the Java parameter name -> value retained
+      .contains("@Header(\"X-Request-Id\") String xRequestId");
   }
 
   private static Path resourcePath(String name) throws URISyntaxException {

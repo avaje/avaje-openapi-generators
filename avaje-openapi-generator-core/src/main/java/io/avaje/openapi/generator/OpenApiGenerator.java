@@ -388,18 +388,21 @@ public final class OpenApiGenerator {
     var schema = parameter.getSchema();
     var type = context.javaType(schema);
     var javaName = variableName(name);
+    // avaje-http falls back to the Java parameter name when the annotation value is
+    // blank, so omit the value when the wire name already matches the parameter name
+    var omitValue = javaName.equals(name);
     var annotations = new ArrayList<String>();
     switch (in) {
       case "path":
         break;
       case "query":
-        annotations.add("@QueryParam(\"" + escape(name) + "\")");
+        annotations.add(paramAnnotation("QueryParam", name, omitValue));
         break;
       case "header":
-        annotations.add("@Header(\"" + escape(name) + "\")");
+        annotations.add(paramAnnotation("Header", name, omitValue));
         break;
       case "cookie":
-        annotations.add("@Cookie(\"" + escape(name) + "\")");
+        annotations.add(paramAnnotation("Cookie", name, omitValue));
         break;
       default:
         context.unsupported("Unsupported parameter location '" + in + "' for parameter " + name);
@@ -417,6 +420,17 @@ public final class OpenApiGenerator {
       && (!Boolean.TRUE.equals(parameter.getRequired())
         || (schema != null && Boolean.TRUE.equals(schema.getNullable())));
     return new ParamDef(javaName, List.copyOf(annotations), type, overloadDrop, dropValue, parameter.getDescription(), nullable);
+  }
+
+  /**
+   * Build an avaje-http parameter annotation, omitting the explicit name value when the
+   * wire name already matches the Java parameter name (avaje-http then falls back to the
+   * parameter name). For example {@code @QueryParam("status")} becomes {@code @QueryParam}.
+   */
+  private static String paramAnnotation(String simpleName, String wireName, boolean omitValue) {
+    return omitValue
+      ? "@" + simpleName
+      : "@" + simpleName + "(\"" + escape(wireName) + "\")";
   }
 
   /**
