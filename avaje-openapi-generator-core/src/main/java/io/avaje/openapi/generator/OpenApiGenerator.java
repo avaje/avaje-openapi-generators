@@ -177,7 +177,9 @@ public final class OpenApiGenerator {
         }
         var propSchema = entry.getValue();
         var fieldNullable = propSchema != null && Boolean.TRUE.equals(propSchema.getNullable());
-        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable, needsValid(propSchema)));
+        var fieldReadOnly = propSchema != null && Boolean.TRUE.equals(propSchema.getReadOnly());
+        var fieldWriteOnly = propSchema != null && Boolean.TRUE.equals(propSchema.getWriteOnly());
+        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable, needsValid(propSchema), fieldReadOnly, fieldWriteOnly));
       }
       var def = new ObjectDef(name, fields, schema.getDescription(), Boolean.TRUE.equals(schema.getDeprecated()));
       add(def);
@@ -716,6 +718,12 @@ public final class OpenApiGenerator {
           source.addImport(context.constraintImport(constraintSimpleName(constraint)));
         }
       }
+      if (context.config.jsonAnnotations() && (field.readOnly() || field.writeOnly())) {
+        if (context.config.jsonStyle() == JsonStyle.JACKSON) {
+          source.addImport("com.fasterxml.jackson.annotation.JsonProperty");
+        }
+        // AVAJE: io.avaje.jsonb.Json already imported above for @Json on the class
+      }
     }
     source.body.append("public record ").append(object.name()).append("(\n");
     for (var i = 0; i < object.fields().size(); i++) {
@@ -732,6 +740,19 @@ public final class OpenApiGenerator {
       if (context.config.validationAnnotations()) {
         for (var constraint : field.constraints()) {
           source.body.append(constraint).append(' ');
+        }
+      }
+      if (context.config.jsonAnnotations() && field.readOnly()) {
+        if (context.config.jsonStyle() == JsonStyle.JACKSON) {
+          source.body.append("@JsonProperty(access = JsonProperty.Access.READ_ONLY) ");
+        } else {
+          source.body.append("@Json.Ignore(deserialize = true) ");
+        }
+      } else if (context.config.jsonAnnotations() && field.writeOnly()) {
+        if (context.config.jsonStyle() == JsonStyle.JACKSON) {
+          source.body.append("@JsonProperty(access = JsonProperty.Access.WRITE_ONLY) ");
+        } else {
+          source.body.append("@Json.Ignore(serialize = true) ");
         }
       }
       source.body.append(field.type().code()).append(' ').append(field.javaName());
@@ -1297,8 +1318,10 @@ public final class OpenApiGenerator {
     private final String description;
     private final boolean nullable;
     private final boolean validate;
+    private final boolean readOnly;
+    private final boolean writeOnly;
 
-    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description, boolean nullable, boolean validate) {
+    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description, boolean nullable, boolean validate, boolean readOnly, boolean writeOnly) {
       this.javaName = javaName;
       this.jsonName = jsonName;
       this.type = type;
@@ -1307,6 +1330,8 @@ public final class OpenApiGenerator {
       this.description = description;
       this.nullable = nullable;
       this.validate = validate;
+      this.readOnly = readOnly;
+      this.writeOnly = writeOnly;
     }
 
     String javaName() {
@@ -1340,6 +1365,16 @@ public final class OpenApiGenerator {
     /** Whether the field type is a generated model and should cascade with {@code @Valid}. */
     boolean validate() {
       return validate;
+    }
+
+    /** Whether this field appears only in responses (serialized out, not deserialized in). */
+    boolean readOnly() {
+      return readOnly;
+    }
+
+    /** Whether this field appears only in requests (deserialized in, not serialized out). */
+    boolean writeOnly() {
+      return writeOnly;
     }
   }
 

@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: ReadOnly WriteOnly test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    UserProfile:
+      type: object
+      description: User profile model
+      required:
+        - username
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Server-assigned identifier
+        username:
+          type: string
+          description: Login name
+        password:
+          type: string
+          writeOnly: true
+          description: Account password (never returned)
+        email:
+          type: string
+          nullable: true
+          description: Contact address

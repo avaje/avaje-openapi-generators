@@ -4,6 +4,7 @@ import io.avaje.openapi.generator.DateTimeType;
 import io.avaje.openapi.generator.DiagnosticSeverity;
 import io.avaje.openapi.generator.GenerationMode;
 import io.avaje.openapi.generator.GeneratorConfig;
+import io.avaje.openapi.generator.JsonStyle;
 import io.avaje.openapi.generator.OpenApiGenerator;
 import io.avaje.openapi.generator.OverloadPolicy;
 import io.avaje.openapi.generator.ValidationStyle;
@@ -52,6 +53,10 @@ public final class GenerateMojo extends AbstractMojo {
   /** Validation annotation style to generate when validation annotations are enabled. */
   @Parameter(defaultValue = "JAKARTA")
   private ValidationStyle validationStyle;
+
+  /** JSON serialisation library style for {@code readOnly}/{@code writeOnly} annotations. */
+  @Parameter(defaultValue = "AVAJE")
+  private JsonStyle jsonStyle;
 
   /** Generate Avaje Jsonb annotations on models. */
   @Parameter(defaultValue = "true")
@@ -155,6 +160,7 @@ public final class GenerateMojo extends AbstractMojo {
       .validationAnnotations(generateValidationAnnotations)
       .validationStyle(validationStyle)
       .jsonAnnotations(generateJsonAnnotations)
+      .jsonStyle(jsonStyle)
       .recordBuilder(generateRecordBuilders)
       .clientAnnotations(generateClientAnnotations)
       .failOnUnsupported(failOnUnsupported)
