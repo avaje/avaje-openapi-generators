@@ -203,6 +203,59 @@ class OpenApiGeneratorTest {
       .contains("@Get(\"/owners/{id}\")");
   }
 
+  @Test
+  void allOfMergeFlattensComposition() throws Exception {
+    var input = resourcePath("openapi/composition.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    // allOf no longer produces an "unsupported" diagnostic
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    // allOf members ($ref base + inline extension) flatten into one record;
+    // inline object/array/map schemas are extracted into named records by the parser
+    assertThat(result.generatedFiles())
+      .extracting(file -> file.path().getFileName().toString())
+      .contains(
+        "Animal.java",
+        "Dog.java",
+        "Pet.java",
+        "PetHomeAddress.java",
+        "PetHomeAddressCountry.java",
+        "PetTags.java",
+        "PetMetadata.java");
+
+    // allOf merge: Animal fields (incl required id) + Dog fields (incl required breed)
+    assertThat(tempDir.resolve("org/example/api/model/Dog.java"))
+      .content()
+      .contains("public record Dog(")
+      .contains("@NotNull Long id")
+      .contains("String name")
+      .contains("@NotNull String breed")
+      .contains("Integer barkVolume");
+
+    // inline object property, array-of-inline-object, map-of-inline-object
+    assertThat(tempDir.resolve("org/example/api/model/Pet.java"))
+      .content()
+      .contains("@NotNull Long id")
+      .contains("PetHomeAddress homeAddress")
+      .contains("List<PetTags> tags")
+      .contains("Map<String, PetMetadata> metadata");
+
+    // deep nesting: an inline object inside an inline object
+    assertThat(tempDir.resolve("org/example/api/model/PetHomeAddress.java"))
+      .content()
+      .contains("@NotNull String city")
+      .contains("PetHomeAddressCountry country");
+
+    assertThat(tempDir.resolve("org/example/api/model/PetMetadata.java"))
+      .content()
+      .contains("Integer score");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }

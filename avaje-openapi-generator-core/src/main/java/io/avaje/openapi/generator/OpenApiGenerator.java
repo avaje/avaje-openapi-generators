@@ -16,7 +16,6 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.ArraySchema;
-import io.swagger.v3.oas.models.media.ComposedSchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
@@ -36,6 +35,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -105,7 +105,7 @@ public final class OpenApiGenerator {
     var schemas = Optional.ofNullable(openApi.getComponents())
       .map(components -> components.getSchemas())
       .orElse(Map.of());
-    var result = new ArrayList<SchemaDef>();
+    var reader = new ModelReader(schemas, context);
     for (var entry : schemas.entrySet()) {
       var schema = entry.getValue();
       if (schema == null) {
@@ -113,13 +113,12 @@ public final class OpenApiGenerator {
       }
       var name = className(entry.getKey());
       if (schema.getEnum() != null && !schema.getEnum().isEmpty()) {
-        result.add(readEnum(name, schema));
+        reader.add(readEnum(name, schema));
       } else {
-        result.add(readObject(name, schema, context));
+        reader.readObject(name, schema);
       }
     }
-    result.sort(Comparator.comparing(SchemaDef::name));
-    return result;
+    return reader.result();
   }
 
   private static EnumDef readEnum(String name, Schema<?> schema) {
@@ -132,23 +131,95 @@ public final class OpenApiGenerator {
     return new EnumDef(name, values);
   }
 
-  private static ObjectDef readObject(String name, Schema<?> schema, Context context) {
-    if (schema instanceof ComposedSchema || schema.getOneOf() != null || schema.getAnyOf() != null) {
-      context.unsupported("Composed schema " + name + " is not supported yet");
+  /**
+   * Reads component object schemas into record models, flattening {@code allOf}
+   * composition into a single record. Inline object schemas (object properties,
+   * array items and map values) are already extracted into named component
+   * schemas by the parser ({@code flatten}), so they arrive here as ordinary
+   * {@code $ref} properties.
+   */
+  private static final class ModelReader {
+
+    private final Map<String, Schema> components;
+    private final Context context;
+    private final Map<String, SchemaDef> models = new LinkedHashMap<>();
+
+    private ModelReader(Map<String, Schema> components, Context context) {
+      this.components = components;
+      this.context = context;
     }
-    var properties = Optional.ofNullable(schema.getProperties()).orElse(Map.of());
-    var required = new HashSet<>(Optional.ofNullable(schema.getRequired()).orElse(List.of()));
-    var fields = new ArrayList<FieldDef>();
-    for (var entry : properties.entrySet()) {
-      var propName = entry.getKey();
-      var javaName = variableName(propName);
-      if (!simpleJavaIdentifier(propName)) {
-        context.unsupported("Schema property '" + name + "." + propName + "' needs JSON property mapping");
+
+    void add(SchemaDef def) {
+      models.putIfAbsent(def.name(), def);
+    }
+
+    List<SchemaDef> result() {
+      var list = new ArrayList<>(models.values());
+      list.sort(Comparator.comparing(SchemaDef::name));
+      return list;
+    }
+
+    /** Read (and register) an object schema as a record model. */
+    ObjectDef readObject(String name, Schema<?> schema) {
+      if (schema.getOneOf() != null || schema.getAnyOf() != null) {
+        context.unsupported("Composed schema " + name + " (oneOf/anyOf) is not supported yet");
       }
-      var propSchema = (Schema<?>) entry.getValue();
-      fields.add(new FieldDef(javaName, propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema)));
+      var properties = new LinkedHashMap<String, Schema<?>>();
+      var required = new LinkedHashSet<String>();
+      collectProperties(schema, properties, required);
+
+      var fields = new ArrayList<FieldDef>();
+      for (var entry : properties.entrySet()) {
+        var propName = entry.getKey();
+        if (!simpleJavaIdentifier(propName)) {
+          context.unsupported("Schema property '" + name + "." + propName + "' needs JSON property mapping");
+        }
+        var propSchema = entry.getValue();
+        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema)));
+      }
+      var def = new ObjectDef(name, fields);
+      add(def);
+      return def;
     }
-    return new ObjectDef(name, fields);
+
+    /**
+     * Merge {@code properties}/{@code required} from a schema, following
+     * {@code allOf} members (resolving {@code $ref} members against the component
+     * schemas). Members are merged in declaration order so a member's property
+     * overrides an earlier member's property of the same name.
+     */
+    private void collectProperties(Schema<?> schema, Map<String, Schema<?>> properties, Set<String> required) {
+      if (schema == null) {
+        return;
+      }
+      var allOf = schema.getAllOf();
+      if (allOf != null) {
+        for (var member : allOf) {
+          collectProperties(resolveRef(member), properties, required);
+        }
+      }
+      var schemaProperties = schema.getProperties();
+      if (schemaProperties != null) {
+        schemaProperties.forEach((key, value) -> properties.put(key, (Schema<?>) value));
+      }
+      var schemaRequired = schema.getRequired();
+      if (schemaRequired != null) {
+        required.addAll(schemaRequired);
+      }
+    }
+
+    /** Resolve a {@code $ref} schema against the component schemas, otherwise return the schema as-is. */
+    private Schema<?> resolveRef(Schema<?> schema) {
+      if (schema == null || schema.get$ref() == null) {
+        return schema;
+      }
+      var ref = schema.get$ref();
+      var target = components.get(ref.substring(ref.lastIndexOf('/') + 1));
+      if (target == null) {
+        context.unsupported("Could not resolve $ref '" + ref + "'");
+      }
+      return target;
+    }
   }
 
   private static List<String> constraints(Schema<?> schema) {

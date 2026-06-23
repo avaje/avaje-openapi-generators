@@ -396,12 +396,14 @@ Supported:
 - JSON request/response bodies
 - path/query/header/cookie parameters (with `@Default` for parameter defaults)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
+- `allOf` composition (members are flattened/merged into a single record)
+- inline object/array/map schemas (extracted into named nested records)
 - configurable `date-time` Java type (global `dateTimeType`, extended formats, `x-java-type`)
 - convenience `default` method overloads (`generateOverloads`, `overloadPolicy`, `x-overload`)
 
 Unsupported features currently produce diagnostics:
 
-- complex `oneOf` / `anyOf` / discriminator models
+- `oneOf` / `anyOf` / discriminator polymorphism
 - multipart upload
 - callbacks, links, webhooks
 - multiple request body content types per operation
