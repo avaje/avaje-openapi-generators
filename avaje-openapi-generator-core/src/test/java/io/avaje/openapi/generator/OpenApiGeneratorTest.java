@@ -85,6 +85,29 @@ class OpenApiGeneratorTest {
       .doesNotContain("builder()");
   }
 
+  @Test
+  void generateApiOnlyWhenModelsDisabled() throws Exception {
+    var input = resourcePath("openapi/pets.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .generateModels(false)
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+    assertThat(result.generatedFiles())
+      .extracting(file -> file.path().getFileName().toString())
+      .containsExactly("PetsApi.java");
+
+    assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
+      .content()
+      .contains("import org.example.api.model.Pet;")
+      .contains("import org.example.api.model.PetStatus;")
+      .contains("List<Pet> listPets(");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }

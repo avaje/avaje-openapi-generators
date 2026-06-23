@@ -156,6 +156,28 @@ public record Pet(
 }
 ```
 
+## API-only generation (reuse existing models)
+
+By default the plugin generates both the API interfaces and the DTO model
+records. Set `generateModels` to `false` to generate **only** the API interfaces.
+The generated interfaces still reference `modelPackage` types, which are expected
+to be provided by an existing (hand-written) module on the classpath.
+
+```xml
+<configuration>
+  <inputSpec>${project.basedir}/src/main/openapi/openapi.yaml</inputSpec>
+  <apiPackage>org.example.api</apiPackage>
+  <modelPackage>org.example.model</modelPackage>
+  <generateModels>false</generateModels>
+</configuration>
+```
+
+This is useful for adopting contract-first on an existing API where the model
+records are already hand-maintained (with their own Javadoc, field types and
+conventions) and should remain the single source of truth — the OpenAPI spec
+then defines only the operations, and the DTO schemas exist purely so the
+generated interface signatures resolve to those existing types.
+
 ## Validation annotations
 
 Validation annotations are enabled by default:

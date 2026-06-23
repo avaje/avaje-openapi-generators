@@ -31,6 +31,7 @@ class GenerateMojoTest {
     set(mojo, "generateRecordBuilders", true);
     set(mojo, "generateClientAnnotations", true);
     set(mojo, "failOnUnsupported", true);
+    set(mojo, "generateModels", true);
     set(mojo, "cleanOutput", true);
     set(mojo, "project", project);
 

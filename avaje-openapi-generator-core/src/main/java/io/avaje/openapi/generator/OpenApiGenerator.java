@@ -74,7 +74,9 @@ public final class OpenApiGenerator {
     var generated = new ArrayList<GeneratedFile>();
     var schemas = readSchemas(openApi, context);
     var apis = readApis(openApi, context);
-    writeModels(schemas, context, generated);
+    if (config.generateModels()) {
+      writeModels(schemas, context, generated);
+    }
     writeApis(apis, context, generated);
     writeFiles(generated, diagnostics);
     return new GenerationResult(generated, diagnostics);

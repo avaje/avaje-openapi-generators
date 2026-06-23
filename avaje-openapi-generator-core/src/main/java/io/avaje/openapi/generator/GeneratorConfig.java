@@ -18,6 +18,7 @@ public final class GeneratorConfig {
   private final boolean recordBuilder;
   private final boolean clientAnnotations;
   private final boolean failOnUnsupported;
+  private final boolean generateModels;
 
   public GeneratorConfig(
     Path inputSpec,
@@ -30,7 +31,8 @@ public final class GeneratorConfig {
     boolean jsonAnnotations,
     boolean recordBuilder,
     boolean clientAnnotations,
-    boolean failOnUnsupported) {
+    boolean failOnUnsupported,
+    boolean generateModels) {
 
     this.inputSpec = requireNonNull(inputSpec, "inputSpec");
     this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory");
@@ -46,6 +48,7 @@ public final class GeneratorConfig {
     this.recordBuilder = recordBuilder;
     this.clientAnnotations = clientAnnotations;
     this.failOnUnsupported = failOnUnsupported;
+    this.generateModels = generateModels;
   }
 
   public Path inputSpec() {
@@ -92,6 +95,16 @@ public final class GeneratorConfig {
     return failOnUnsupported;
   }
 
+  /**
+   * When {@code false}, DTO model records/enums are not generated; only the API
+   * interfaces are generated. The interfaces still reference {@code modelPackage}
+   * types, which are expected to be provided by an existing (hand-written) module
+   * on the classpath. Defaults to {@code true}.
+   */
+  public boolean generateModels() {
+    return generateModels;
+  }
+
   /** Return a builder with required values. */
   public static Builder builder(Path inputSpec, Path outputDirectory, String apiPackage) {
     return new Builder(inputSpec, outputDirectory, apiPackage);
@@ -110,6 +123,7 @@ public final class GeneratorConfig {
     private boolean recordBuilder;
     private boolean clientAnnotations = true;
     private boolean failOnUnsupported = true;
+    private boolean generateModels = true;
 
     private Builder(Path inputSpec, Path outputDirectory, String apiPackage) {
       this.inputSpec = inputSpec;
@@ -157,6 +171,11 @@ public final class GeneratorConfig {
       return this;
     }
 
+    public Builder generateModels(boolean generateModels) {
+      this.generateModels = generateModels;
+      return this;
+    }
+
     public GeneratorConfig build() {
       return new GeneratorConfig(
         inputSpec,
@@ -169,7 +188,8 @@ public final class GeneratorConfig {
         jsonAnnotations,
         recordBuilder,
         clientAnnotations,
-        failOnUnsupported);
+        failOnUnsupported,
+        generateModels);
     }
   }
 }
