@@ -33,7 +33,13 @@ class OpenApiGeneratorTest {
       .contains("@Get")
       .contains("@Post")
       .contains("List<Pet> listPets(@QueryParam(\"limit\") Integer limit, @QueryParam(\"status\") PetStatus status)")
+      .contains("Stream<Pet> streamPets(@QueryParam(\"status\") PetStatus status)")
+      .contains("import java.util.stream.Stream;")
       .contains("Pet getPet(Long id, @Header(\"X-Request-Id\") String xRequestId)");
+
+    assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
+      .content()
+      .doesNotContain("@Produces(value = \"application/stream+json\")");
 
     assertThat(tempDir.resolve("org/example/api/model/Pet.java"))
       .content()

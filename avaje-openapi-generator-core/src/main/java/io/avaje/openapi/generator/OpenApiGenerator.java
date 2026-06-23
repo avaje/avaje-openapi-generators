@@ -48,6 +48,18 @@ import java.util.stream.Collectors;
 public final class OpenApiGenerator {
 
   private static final String APPLICATION_JSON = "application/json";
+  private static final String APPLICATION_STREAM_JSON = "application/stream+json";
+  private static final String APPLICATION_NDJSON = "application/x-ndjson";
+
+  /**
+   * Streaming media types map to a {@code Stream<T>} return type rather than
+   * {@code List<T>}. The Avaje HTTP processors (client and server generators)
+   * detect streaming purely from the {@code java.util.stream.Stream} return type,
+   * so no {@code @Produces} annotation is emitted for these.
+   */
+  private static boolean isStreamingMedia(String mediaType) {
+    return APPLICATION_STREAM_JSON.equals(mediaType) || APPLICATION_NDJSON.equals(mediaType);
+  }
 
   /** Generate Java source for the given configuration. */
   public GenerationResult generate(GeneratorConfig config) {
@@ -242,7 +254,8 @@ public final class OpenApiGenerator {
       response.type(),
       response.statusCode(),
       response.mediaType(),
-      requestMediaType(operation.getRequestBody()));
+      requestMediaType(operation.getRequestBody()),
+      response.streaming());
   }
 
   private static ParamDef readParameter(Context context, Parameter parameter) {
@@ -306,15 +319,19 @@ public final class OpenApiGenerator {
         return readResponse(context, code, entry.getValue());
       }
     }
-    return new ResponseDef(JavaType.simple("void"), 200, APPLICATION_JSON);
+    return new ResponseDef(JavaType.simple("void"), 200, APPLICATION_JSON, false);
   }
 
   private static ResponseDef readResponse(Context context, int statusCode, ApiResponse response) {
     var media = selectMedia(response == null ? null : response.getContent());
     if (media == null || media.mediaType().getSchema() == null) {
-      return new ResponseDef(JavaType.simple("void"), statusCode, APPLICATION_JSON);
+      return new ResponseDef(JavaType.simple("void"), statusCode, APPLICATION_JSON, false);
     }
-    return new ResponseDef(context.javaType(media.mediaType().getSchema()), statusCode, media.name());
+    var schema = media.mediaType().getSchema();
+    if (isStreamingMedia(media.name())) {
+      return new ResponseDef(context.streamType(schema), statusCode, media.name(), true);
+    }
+    return new ResponseDef(context.javaType(schema), statusCode, media.name(), false);
   }
 
   private static int parseStatus(String status) {
@@ -489,10 +506,14 @@ public final class OpenApiGenerator {
       source.body.append("  @Consumes(\"").append(escape(operation.requestMediaType())).append("\")\n");
     }
     var expectedStatus = defaultStatus(operation.httpMethod(), operation.returnType().code());
-    if (operation.statusCode() != expectedStatus || !APPLICATION_JSON.equals(operation.responseMediaType())) {
+    // Streaming responses are signalled by the Stream<T> return type; the Avaje
+    // HTTP processors set application/stream+json automatically, so no @Produces
+    // media value is emitted for them.
+    var nonDefaultMedia = !operation.streaming() && !APPLICATION_JSON.equals(operation.responseMediaType());
+    if (operation.statusCode() != expectedStatus || nonDefaultMedia) {
       source.addImport("io.avaje.http.api.Produces");
       source.body.append("  @Produces(");
-      if (!APPLICATION_JSON.equals(operation.responseMediaType())) {
+      if (nonDefaultMedia) {
         source.body.append("value = \"").append(escape(operation.responseMediaType())).append("\"");
         if (operation.statusCode() != expectedStatus) {
           source.body.append(", ");
@@ -618,6 +639,21 @@ public final class OpenApiGenerator {
         default:
           return JavaType.simple("Object");
       }
+    }
+
+    /**
+     * Build a {@code Stream<T>} return type for a streaming response. When the
+     * schema is an array the element type is streamed; otherwise the schema
+     * itself is treated as the streamed element type.
+     */
+    JavaType streamType(Schema<?> schema) {
+      JavaType element;
+      if (schema instanceof ArraySchema || (schema != null && "array".equals(schema.getType()))) {
+        element = javaType(schema.getItems());
+      } else {
+        element = javaType(schema);
+      }
+      return JavaType.generic("Stream", "java.util.stream.Stream", element);
     }
 
     private JavaType stringType(String format) {
@@ -827,6 +863,7 @@ public final class OpenApiGenerator {
     private final int statusCode;
     private final String responseMediaType;
     private final String requestMediaType;
+    private final boolean streaming;
 
     private OperationDef(
       String httpMethod,
@@ -837,7 +874,8 @@ public final class OpenApiGenerator {
       JavaType returnType,
       int statusCode,
       String responseMediaType,
-      String requestMediaType) {
+      String requestMediaType,
+      boolean streaming) {
 
       this.httpMethod = httpMethod;
       this.fullPath = fullPath;
@@ -848,6 +886,7 @@ public final class OpenApiGenerator {
       this.statusCode = statusCode;
       this.responseMediaType = responseMediaType;
       this.requestMediaType = requestMediaType;
+      this.streaming = streaming;
     }
 
     String httpMethod() {
@@ -886,6 +925,10 @@ public final class OpenApiGenerator {
       return requestMediaType;
     }
 
+    boolean streaming() {
+      return streaming;
+    }
+
     OperationDef withMethodPath(String methodPath) {
       return new OperationDef(
         httpMethod,
@@ -896,7 +939,8 @@ public final class OpenApiGenerator {
         returnType,
         statusCode,
         responseMediaType,
-        requestMediaType);
+        requestMediaType,
+        streaming);
     }
   }
 
@@ -928,11 +972,13 @@ public final class OpenApiGenerator {
     private final JavaType type;
     private final int statusCode;
     private final String mediaType;
+    private final boolean streaming;
 
-    private ResponseDef(JavaType type, int statusCode, String mediaType) {
+    private ResponseDef(JavaType type, int statusCode, String mediaType, boolean streaming) {
       this.type = type;
       this.statusCode = statusCode;
       this.mediaType = mediaType;
+      this.streaming = streaming;
     }
 
     JavaType type() {
@@ -945,6 +991,10 @@ public final class OpenApiGenerator {
 
     String mediaType() {
       return mediaType;
+    }
+
+    boolean streaming() {
+      return streaming;
     }
   }
 

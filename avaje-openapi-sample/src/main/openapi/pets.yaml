@@ -40,6 +40,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Pet'
+  /pets/stream:
+    get:
+      tags:
+        - pets
+      operationId: streamPets
+      responses:
+        '200':
+          description: Newline-delimited stream of pets
+          content:
+            application/stream+json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
   /pets/{id}:
     get:
       tags:
