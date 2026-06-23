@@ -19,6 +19,7 @@ public final class GeneratorConfig {
   private final boolean clientAnnotations;
   private final boolean failOnUnsupported;
   private final boolean generateModels;
+  private final DateTimeType dateTimeType;
 
   public GeneratorConfig(
     Path inputSpec,
@@ -32,7 +33,8 @@ public final class GeneratorConfig {
     boolean recordBuilder,
     boolean clientAnnotations,
     boolean failOnUnsupported,
-    boolean generateModels) {
+    boolean generateModels,
+    DateTimeType dateTimeType) {
 
     this.inputSpec = requireNonNull(inputSpec, "inputSpec");
     this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory");
@@ -49,6 +51,7 @@ public final class GeneratorConfig {
     this.clientAnnotations = clientAnnotations;
     this.failOnUnsupported = failOnUnsupported;
     this.generateModels = generateModels;
+    this.dateTimeType = dateTimeType == null ? DateTimeType.OFFSET_DATE_TIME : dateTimeType;
   }
 
   public Path inputSpec() {
@@ -105,6 +108,15 @@ public final class GeneratorConfig {
     return generateModels;
   }
 
+  /**
+   * The {@code java.time} type used for {@code format: date-time} properties that
+   * do not specify a per-property override. Defaults to
+   * {@link DateTimeType#OFFSET_DATE_TIME}.
+   */
+  public DateTimeType dateTimeType() {
+    return dateTimeType;
+  }
+
   /** Return a builder with required values. */
   public static Builder builder(Path inputSpec, Path outputDirectory, String apiPackage) {
     return new Builder(inputSpec, outputDirectory, apiPackage);
@@ -124,6 +136,7 @@ public final class GeneratorConfig {
     private boolean clientAnnotations = true;
     private boolean failOnUnsupported = true;
     private boolean generateModels = true;
+    private DateTimeType dateTimeType = DateTimeType.OFFSET_DATE_TIME;
 
     private Builder(Path inputSpec, Path outputDirectory, String apiPackage) {
       this.inputSpec = inputSpec;
@@ -176,6 +189,11 @@ public final class GeneratorConfig {
       return this;
     }
 
+    public Builder dateTimeType(DateTimeType dateTimeType) {
+      this.dateTimeType = dateTimeType;
+      return this;
+    }
+
     public GeneratorConfig build() {
       return new GeneratorConfig(
         inputSpec,
@@ -189,7 +207,8 @@ public final class GeneratorConfig {
         recordBuilder,
         clientAnnotations,
         failOnUnsupported,
-        generateModels);
+        generateModels,
+        dateTimeType);
     }
   }
 }

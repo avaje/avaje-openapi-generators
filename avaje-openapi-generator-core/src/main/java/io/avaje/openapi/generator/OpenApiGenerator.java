@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -632,6 +631,10 @@ public final class OpenApiGenerator {
       if (schema == null) {
         return JavaType.simple("Object");
       }
+      var xJavaType = extensionString(schema, "x-java-type");
+      if (xJavaType != null) {
+        return javaTypeFromName(xJavaType);
+      }
       if (schema.get$ref() != null) {
         var name = schema.get$ref().substring(schema.get$ref().lastIndexOf('/') + 1);
         return JavaType.of(className(name), config.modelPackage() + "." + className(name));
@@ -686,7 +689,15 @@ public final class OpenApiGenerator {
         case "date":
           return JavaType.of("LocalDate", LocalDate.class.getName());
         case "date-time":
-          return JavaType.of("Instant", Instant.class.getName());
+          return dateTimeJavaType(config.dateTimeType());
+        case "instant":
+          return dateTimeJavaType(DateTimeType.INSTANT);
+        case "offset-date-time":
+          return dateTimeJavaType(DateTimeType.OFFSET_DATE_TIME);
+        case "local-date-time":
+          return dateTimeJavaType(DateTimeType.LOCAL_DATE_TIME);
+        case "zoned-date-time":
+          return dateTimeJavaType(DateTimeType.ZONED_DATE_TIME);
         case "uuid":
           return JavaType.of("UUID", UUID.class.getName());
         case "binary":
@@ -694,6 +705,39 @@ public final class OpenApiGenerator {
         default:
           return JavaType.simple("String");
       }
+    }
+
+    private static JavaType dateTimeJavaType(DateTimeType type) {
+      return JavaType.of(type.simpleName(), type.className());
+    }
+
+    /** Read a string-valued {@code x-} vendor extension, or {@code null} when absent. */
+    private static String extensionString(Schema<?> schema, String name) {
+      var extensions = schema.getExtensions();
+      if (extensions == null) {
+        return null;
+      }
+      var value = extensions.get(name);
+      return value == null ? null : value.toString();
+    }
+
+    /**
+     * Resolve a Java type from a fully qualified class name supplied via
+     * {@code x-java-type}. {@code java.lang} types and simple (unqualified) names
+     * are emitted without an import.
+     */
+    private static JavaType javaTypeFromName(String typeName) {
+      var name = typeName.trim();
+      var lastDot = name.lastIndexOf('.');
+      if (lastDot < 0) {
+        return JavaType.simple(name);
+      }
+      var simple = name.substring(lastDot + 1);
+      var packageName = name.substring(0, lastDot);
+      if (packageName.equals("java.lang")) {
+        return JavaType.simple(simple);
+      }
+      return JavaType.of(simple, name);
     }
 
     private JavaType integerType(String format) {

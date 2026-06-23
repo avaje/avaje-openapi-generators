@@ -48,7 +48,12 @@ class OpenApiGeneratorTest {
       .contains("@Json")
       .contains("@NotNull @Min(1) Long id")
       .contains("@NotNull @Size(min = 1, max = 100) String name")
-      .contains("Instant createdAt")
+      .contains("OffsetDateTime createdAt")
+      .contains("Instant updatedAt")
+      .contains("ZonedDateTime auditedAt")
+      .contains("import java.time.OffsetDateTime;")
+      .contains("import java.time.Instant;")
+      .contains("import java.time.ZonedDateTime;")
       .contains("LocalDate birthDate")
       .contains("UUID externalId")
       .contains("Map<String, String> attributes");
@@ -107,6 +112,30 @@ class OpenApiGeneratorTest {
       .contains("import org.example.api.model.Pet;")
       .contains("import org.example.api.model.PetStatus;")
       .contains("List<Pet> listPets(");
+  }
+
+  @Test
+  void dateTimeTypeInstantGlobalOption() throws Exception {
+    var input = resourcePath("openapi/pets.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .dateTimeType(DateTimeType.INSTANT)
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/model/Pet.java"))
+      .content()
+      // format: date-time follows the global option
+      .contains("Instant createdAt")
+      // format: instant is always Instant
+      .contains("Instant updatedAt")
+      // x-java-type still overrides the global option
+      .contains("ZonedDateTime auditedAt")
+      .doesNotContain("OffsetDateTime");
   }
 
   private static Path resourcePath(String name) throws URISyntaxException {
