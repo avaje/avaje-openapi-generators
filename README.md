@@ -398,6 +398,7 @@ Supported:
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 - `allOf` composition (members are flattened/merged into a single record)
 - inline object/array/map schemas (extracted into named nested records)
+- `description`/`summary` rendered as Javadoc and `deprecated` as `@Deprecated` (schemas, enums, operations, fields, parameters)
 - configurable `date-time` Java type (global `dateTimeType`, extended formats, `x-java-type`)
 - convenience `default` method overloads (`generateOverloads`, `overloadPolicy`, `x-overload`)
 

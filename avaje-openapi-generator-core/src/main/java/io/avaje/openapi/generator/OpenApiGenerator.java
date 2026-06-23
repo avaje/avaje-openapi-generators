@@ -128,7 +128,7 @@ public final class OpenApiGenerator {
       var value = String.valueOf(raw);
       values.add(new EnumValue(enumConstant(value, existing), value));
     }
-    return new EnumDef(name, values);
+    return new EnumDef(name, values, schema.getDescription(), Boolean.TRUE.equals(schema.getDeprecated()));
   }
 
   /**
@@ -175,9 +175,9 @@ public final class OpenApiGenerator {
           context.unsupported("Schema property '" + name + "." + propName + "' needs JSON property mapping");
         }
         var propSchema = entry.getValue();
-        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema)));
+        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription()));
       }
-      var def = new ObjectDef(name, fields);
+      var def = new ObjectDef(name, fields, schema.getDescription(), Boolean.TRUE.equals(schema.getDeprecated()));
       add(def);
       return def;
     }
@@ -360,7 +360,25 @@ public final class OpenApiGenerator {
       response.statusCode(),
       response.mediaType(),
       requestMediaType(operation.getRequestBody()),
-      response.streaming());
+      response.streaming(),
+      operationDoc(operation),
+      Boolean.TRUE.equals(operation.getDeprecated()),
+      response.description());
+  }
+
+  /** Combine an operation {@code summary} and {@code description} into a Javadoc body. */
+  private static String operationDoc(Operation operation) {
+    var summary = operation.getSummary();
+    var description = operation.getDescription();
+    var hasSummary = summary != null && !summary.isBlank();
+    var hasDescription = description != null && !description.isBlank();
+    if (hasSummary && hasDescription) {
+      return summary.strip() + "\n\n" + description.strip();
+    }
+    if (hasSummary) {
+      return summary;
+    }
+    return description;
   }
 
   private static ParamDef readParameter(Context context, Parameter parameter) {
@@ -394,7 +412,7 @@ public final class OpenApiGenerator {
     }
     var overloadDrop = overloadDrop(context, parameter, in, defaultValue);
     var dropValue = dropValue(type, defaultValue);
-    return new ParamDef(javaName, List.copyOf(annotations), type, overloadDrop, dropValue);
+    return new ParamDef(javaName, List.copyOf(annotations), type, overloadDrop, dropValue, parameter.getDescription());
   }
 
   /**
@@ -476,7 +494,7 @@ public final class OpenApiGenerator {
       return Optional.empty();
     }
     var type = context.javaType(media.mediaType().getSchema());
-    return Optional.of(new ParamDef(bodyName(type), List.of(), type, false, "null"));
+    return Optional.of(new ParamDef(bodyName(type), List.of(), type, false, "null", requestBody.getDescription()));
   }
 
   private static String bodyName(JavaType type) {
@@ -501,19 +519,20 @@ public final class OpenApiGenerator {
         return readResponse(context, code, entry.getValue());
       }
     }
-    return new ResponseDef(JavaType.simple("void"), 200, APPLICATION_JSON, false);
+    return new ResponseDef(JavaType.simple("void"), 200, APPLICATION_JSON, false, null);
   }
 
   private static ResponseDef readResponse(Context context, int statusCode, ApiResponse response) {
     var media = selectMedia(response == null ? null : response.getContent());
+    var description = response == null ? null : response.getDescription();
     if (media == null || media.mediaType().getSchema() == null) {
-      return new ResponseDef(JavaType.simple("void"), statusCode, APPLICATION_JSON, false);
+      return new ResponseDef(JavaType.simple("void"), statusCode, APPLICATION_JSON, false, description);
     }
     var schema = media.mediaType().getSchema();
     if (isStreamingMedia(media.name())) {
-      return new ResponseDef(context.streamType(schema), statusCode, media.name(), true);
+      return new ResponseDef(context.streamType(schema), statusCode, media.name(), true, description);
     }
-    return new ResponseDef(context.javaType(schema), statusCode, media.name(), false);
+    return new ResponseDef(context.javaType(schema), statusCode, media.name(), false, description);
   }
 
   private static int parseStatus(String status) {
@@ -563,6 +582,16 @@ public final class OpenApiGenerator {
 
   private static void writeObject(ObjectDef object, Context context, List<GeneratedFile> generated) {
     var source = new JavaSource(context.config.modelPackage());
+    var docTags = new ArrayList<String>();
+    for (var field : object.fields()) {
+      if (field.description() != null && !field.description().isBlank()) {
+        docTags.add("@param " + field.javaName() + ' ' + firstLine(field.description()));
+      }
+    }
+    source.body.append(javadoc("", object.description(), docTags));
+    if (object.deprecated()) {
+      source.body.append("@Deprecated\n");
+    }
     if (context.config.recordBuilder()) {
       source.addImport("io.avaje.recordbuilder.RecordBuilder");
       source.body.append("@RecordBuilder\n");
@@ -637,6 +666,10 @@ public final class OpenApiGenerator {
 
   private static void writeEnum(EnumDef enumDef, Context context, List<GeneratedFile> generated) {
     var source = new JavaSource(context.config.modelPackage());
+    source.body.append(javadoc("", enumDef.description(), List.of()));
+    if (enumDef.deprecated()) {
+      source.body.append("@Deprecated\n");
+    }
     if (context.config.jsonAnnotations()) {
       source.addImport("io.avaje.jsonb.Json");
       source.body.append("@Json\n");
@@ -675,6 +708,20 @@ public final class OpenApiGenerator {
   }
 
   private static void writeOperation(JavaSource source, OperationDef operation, Context context) {
+    var docTags = new ArrayList<String>();
+    for (var param : operation.parameters()) {
+      if (param.description() != null && !param.description().isBlank()) {
+        docTags.add("@param " + param.name() + ' ' + firstLine(param.description()));
+      }
+    }
+    if (!"void".equals(operation.returnType().code())
+      && operation.returnDescription() != null && !operation.returnDescription().isBlank()) {
+      docTags.add("@return " + firstLine(operation.returnDescription()));
+    }
+    source.body.append(javadoc("  ", operation.description(), docTags));
+    if (operation.deprecated()) {
+      source.body.append("  @Deprecated\n");
+    }
     var annotation = methodAnnotation(operation.httpMethod());
     source.addImport("io.avaje.http.api." + annotation);
     source.body.append("  @").append(annotation);
@@ -823,6 +870,51 @@ public final class OpenApiGenerator {
 
   private static String escape(String value) {
     return value.replace("\\", "\\\\").replace("\"", "\\\"");
+  }
+
+  /**
+   * Render a Javadoc block indented by {@code indent} from an optional multi-line
+   * {@code description} and a list of fully-formed tag lines (e.g.
+   * {@code "@param id the id"}). Returns an empty string when there is nothing to
+   * document.
+   */
+  private static String javadoc(String indent, String description, List<String> tags) {
+    var hasDescription = description != null && !description.isBlank();
+    if (!hasDescription && tags.isEmpty()) {
+      return "";
+    }
+    var out = new StringBuilder();
+    out.append(indent).append("/**\n");
+    if (hasDescription) {
+      for (var line : description.strip().split("\n", -1)) {
+        if (line.isBlank()) {
+          out.append(indent).append(" *\n");
+        } else {
+          out.append(indent).append(" * ").append(sanitizeJavadoc(line)).append('\n');
+        }
+      }
+    }
+    if (!tags.isEmpty()) {
+      if (hasDescription) {
+        out.append(indent).append(" *\n");
+      }
+      for (var tag : tags) {
+        out.append(indent).append(" * ").append(tag).append('\n');
+      }
+    }
+    out.append(indent).append(" */\n");
+    return out.toString();
+  }
+
+  /** Escape sequences that would prematurely close a Javadoc comment. */
+  private static String sanitizeJavadoc(String text) {
+    return text.replace("*/", "*&#47;");
+  }
+
+  /** The first (sanitized, trimmed) line of a description, for single-line tag text. */
+  private static String firstLine(String text) {
+    var newline = text.indexOf('\n');
+    return sanitizeJavadoc((newline < 0 ? text : text.substring(0, newline)).strip());
   }
 
   private static final class Context {
@@ -1017,10 +1109,14 @@ public final class OpenApiGenerator {
   private static final class ObjectDef implements SchemaDef {
     private final String name;
     private final List<FieldDef> fields;
+    private final String description;
+    private final boolean deprecated;
 
-    private ObjectDef(String name, List<FieldDef> fields) {
+    private ObjectDef(String name, List<FieldDef> fields, String description, boolean deprecated) {
       this.name = name;
       this.fields = List.copyOf(fields);
+      this.description = description;
+      this.deprecated = deprecated;
     }
 
     @Override
@@ -1031,6 +1127,14 @@ public final class OpenApiGenerator {
     List<FieldDef> fields() {
       return fields;
     }
+
+    String description() {
+      return description;
+    }
+
+    boolean deprecated() {
+      return deprecated;
+    }
   }
 
   private static final class FieldDef {
@@ -1039,13 +1143,15 @@ public final class OpenApiGenerator {
     private final JavaType type;
     private final boolean required;
     private final List<String> constraints;
+    private final String description;
 
-    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints) {
+    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description) {
       this.javaName = javaName;
       this.jsonName = jsonName;
       this.type = type;
       this.required = required;
       this.constraints = List.copyOf(constraints);
+      this.description = description;
     }
 
     String javaName() {
@@ -1067,15 +1173,23 @@ public final class OpenApiGenerator {
     List<String> constraints() {
       return constraints;
     }
+
+    String description() {
+      return description;
+    }
   }
 
   private static final class EnumDef implements SchemaDef {
     private final String name;
     private final List<EnumValue> values;
+    private final String description;
+    private final boolean deprecated;
 
-    private EnumDef(String name, List<EnumValue> values) {
+    private EnumDef(String name, List<EnumValue> values, String description, boolean deprecated) {
       this.name = name;
       this.values = List.copyOf(values);
+      this.description = description;
+      this.deprecated = deprecated;
     }
 
     @Override
@@ -1085,6 +1199,14 @@ public final class OpenApiGenerator {
 
     List<EnumValue> values() {
       return values;
+    }
+
+    String description() {
+      return description;
+    }
+
+    boolean deprecated() {
+      return deprecated;
     }
   }
 
@@ -1141,6 +1263,9 @@ public final class OpenApiGenerator {
     private final String responseMediaType;
     private final String requestMediaType;
     private final boolean streaming;
+    private final String description;
+    private final boolean deprecated;
+    private final String returnDescription;
 
     private OperationDef(
       String httpMethod,
@@ -1152,7 +1277,10 @@ public final class OpenApiGenerator {
       int statusCode,
       String responseMediaType,
       String requestMediaType,
-      boolean streaming) {
+      boolean streaming,
+      String description,
+      boolean deprecated,
+      String returnDescription) {
 
       this.httpMethod = httpMethod;
       this.fullPath = fullPath;
@@ -1164,6 +1292,9 @@ public final class OpenApiGenerator {
       this.responseMediaType = responseMediaType;
       this.requestMediaType = requestMediaType;
       this.streaming = streaming;
+      this.description = description;
+      this.deprecated = deprecated;
+      this.returnDescription = returnDescription;
     }
 
     String httpMethod() {
@@ -1206,6 +1337,18 @@ public final class OpenApiGenerator {
       return streaming;
     }
 
+    String description() {
+      return description;
+    }
+
+    boolean deprecated() {
+      return deprecated;
+    }
+
+    String returnDescription() {
+      return returnDescription;
+    }
+
     OperationDef withMethodPath(String methodPath) {
       return new OperationDef(
         httpMethod,
@@ -1217,7 +1360,10 @@ public final class OpenApiGenerator {
         statusCode,
         responseMediaType,
         requestMediaType,
-        streaming);
+        streaming,
+        description,
+        deprecated,
+        returnDescription);
     }
   }
 
@@ -1227,13 +1373,15 @@ public final class OpenApiGenerator {
     private final JavaType type;
     private final boolean overloadDrop;
     private final String dropValue;
+    private final String description;
 
-    private ParamDef(String name, List<String> annotations, JavaType type, boolean overloadDrop, String dropValue) {
+    private ParamDef(String name, List<String> annotations, JavaType type, boolean overloadDrop, String dropValue, String description) {
       this.name = name;
       this.annotations = annotations;
       this.type = type;
       this.overloadDrop = overloadDrop;
       this.dropValue = dropValue;
+      this.description = description;
     }
 
     String name() {
@@ -1257,6 +1405,10 @@ public final class OpenApiGenerator {
     String dropValue() {
       return dropValue;
     }
+
+    String description() {
+      return description;
+    }
   }
 
   private static final class ResponseDef {
@@ -1264,12 +1416,14 @@ public final class OpenApiGenerator {
     private final int statusCode;
     private final String mediaType;
     private final boolean streaming;
+    private final String description;
 
-    private ResponseDef(JavaType type, int statusCode, String mediaType, boolean streaming) {
+    private ResponseDef(JavaType type, int statusCode, String mediaType, boolean streaming, String description) {
       this.type = type;
       this.statusCode = statusCode;
       this.mediaType = mediaType;
       this.streaming = streaming;
+      this.description = description;
     }
 
     JavaType type() {
@@ -1286,6 +1440,10 @@ public final class OpenApiGenerator {
 
     boolean streaming() {
       return streaming;
+    }
+
+    String description() {
+      return description;
     }
   }
 

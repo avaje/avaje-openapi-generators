@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: Documented API
+  version: 1.0.0
+paths:
+  /widgets/{id}:
+    get:
+      tags: [widgets]
+      operationId: getWidget
+      summary: Fetch a widget
+      description: |
+        Returns a single widget by its identifier.
+        The widget includes its current status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The widget identifier
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: The requested widget
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Widget'
+  /legacy:
+    get:
+      tags: [widgets]
+      operationId: legacyList
+      summary: List legacy widgets
+      deprecated: true
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Widget'
+components:
+  schemas:
+    Widget:
+      type: object
+      description: A widget that does widget things.
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: The unique widget identifier
+        name:
+          type: string
+          description: A human readable widget name
+        status:
+          $ref: '#/components/schemas/WidgetStatus'
+    WidgetStatus:
+      type: string
+      description: The lifecycle status of a widget.
+      enum: [ACTIVE, RETIRED]
+    OldWidget:
+      type: object
+      deprecated: true
+      description: Superseded by Widget.
+      properties:
+        id:
+          type: integer
+          format: int64
