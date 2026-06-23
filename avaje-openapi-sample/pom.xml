@@ -74,6 +74,7 @@
               <modelPackage>org.example.api.model</modelPackage>
               <validationStyle>AVAJE</validationStyle>
               <generateRecordBuilders>true</generateRecordBuilders>
+              <generateOverloads>true</generateOverloads>
             </configuration>
           </execution>
         </executions>

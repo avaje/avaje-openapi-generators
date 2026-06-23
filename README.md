@@ -247,6 +247,67 @@ Wrapper types `Boolean`, `Integer`, `Long`, `Double` and `Float` are unboxed to
 their primitive form when a default is present. Other types keep their declared
 type and simply gain the `@Default("...")` annotation.
 
+## Overloads
+
+Set `generateOverloads` to `true` to emit convenience `default` method overloads
+that omit a trailing run of **omittable** parameters and delegate to the full
+method. The overloads carry no HTTP annotation, so the Avaje HTTP server and
+client generators ignore them — they exist purely for caller ergonomics and are
+inherited by both the controller and the generated HTTP client.
+
+```xml
+<generateOverloads>true</generateOverloads>
+<overloadPolicy>NULLABLE_ONLY</overloadPolicy>
+<!-- EXPLICIT | NULLABLE_ONLY (default) | ALL_OPTIONAL -->
+```
+
+Only a contiguous run of omittable parameters at the **end** of the signature can
+be dropped (Java overloads can only omit trailing arguments). Path parameters and
+request bodies are never omittable. The `overloadPolicy` decides which parameters
+are omittable by default:
+
+| Policy          | Omittable parameters                                  | Value passed when omitted |
+| --------------- | ----------------------------------------------------- | ------------------------- |
+| `EXPLICIT`      | only those marked `x-overload: true`                  | default, or `null`        |
+| `NULLABLE_ONLY` | optional parameters **without** a `default` (default) | `null`                    |
+| `ALL_OPTIONAL`  | every optional parameter (including defaulted ones)   | its `default` literal     |
+
+A per-parameter `x-overload` vendor extension overrides the policy for that
+parameter (`true` forces omittable, `false` forces required):
+
+```yaml
+parameters:
+  - name: modifiedSince      # optional, no default -> dropped under NULLABLE_ONLY
+    in: query
+    schema:
+      type: string
+      format: date-time
+  - name: withMachines       # defaulted, but opted in -> dropped, passing its default
+    in: query
+    x-overload: true
+    schema:
+      type: boolean
+      default: false
+```
+
+For an endpoint `findFleet(fleetGid, useMaster, withMachines, withDrivers)` where
+`withMachines`/`withDrivers` are marked `x-overload: true` and `useMaster` keeps
+its default, the generator emits one overload per trailing suffix length:
+
+```java
+FleetDetail findFleet(UUID fleetGid, @QueryParam("useMaster") @Default("false") boolean useMaster,
+    @QueryParam("withMachines") @Default("false") boolean withMachines,
+    @QueryParam("withDrivers") @Default("false") boolean withDrivers);
+
+default FleetDetail findFleet(UUID fleetGid, boolean useMaster, boolean withMachines) {
+  return findFleet(fleetGid, useMaster, withMachines, false);
+}
+
+default FleetDetail findFleet(UUID fleetGid, boolean useMaster) {
+  return findFleet(fleetGid, useMaster, false, false);
+}
+```
+
 ## Date-time types
 
 OpenAPI's `format: date-time` (RFC 3339) carries a timezone offset, so it maps to
@@ -296,6 +357,7 @@ Supported:
 - path/query/header/cookie parameters (with `@Default` for parameter defaults)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 - configurable `date-time` Java type (global `dateTimeType`, extended formats, `x-java-type`)
+- convenience `default` method overloads (`generateOverloads`, `overloadPolicy`, `x-overload`)
 
 Unsupported features currently produce diagnostics:
 

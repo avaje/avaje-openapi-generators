@@ -288,7 +288,61 @@ public final class OpenApiGenerator {
       // a default guarantees a value, so use the primitive form where applicable
       type = primitiveType(type);
     }
-    return new ParamDef(javaName, List.copyOf(annotations), type);
+    var overloadDrop = overloadDrop(context, parameter, in, defaultValue);
+    var dropValue = dropValue(type, defaultValue);
+    return new ParamDef(javaName, List.copyOf(annotations), type, overloadDrop, dropValue);
+  }
+
+  /**
+   * Decide whether a parameter may be omitted from a generated convenience overload.
+   * Path parameters are never omittable; an explicit {@code x-overload} extension wins,
+   * otherwise the configured {@link OverloadPolicy} applies.
+   */
+  private static boolean overloadDrop(Context context, Parameter parameter, String in, Object defaultValue) {
+    if ("path".equals(in)) {
+      return false;
+    }
+    var explicit = parameterExtensionBoolean(parameter, "x-overload");
+    if (explicit != null) {
+      return explicit;
+    }
+    var optional = !Boolean.TRUE.equals(parameter.getRequired());
+    switch (context.config.overloadPolicy()) {
+      case ALL_OPTIONAL:
+        return optional;
+      case NULLABLE_ONLY:
+        return optional && defaultValue == null;
+      case EXPLICIT:
+      default:
+        return false;
+    }
+  }
+
+  /** The literal passed for an omitted parameter: its default value, or {@code null}. */
+  private static String dropValue(JavaType type, Object defaultValue) {
+    if (defaultValue == null) {
+      return "null";
+    }
+    if ("String".equals(type.code())) {
+      return "\"" + escape(String.valueOf(defaultValue)) + "\"";
+    }
+    return String.valueOf(defaultValue);
+  }
+
+  /** Read a boolean {@code x-} vendor extension on a parameter, or {@code null} when absent. */
+  private static Boolean parameterExtensionBoolean(Parameter parameter, String name) {
+    var extensions = parameter.getExtensions();
+    if (extensions == null) {
+      return null;
+    }
+    var value = extensions.get(name);
+    if (value instanceof Boolean) {
+      return (Boolean) value;
+    }
+    if (value != null) {
+      return Boolean.valueOf(value.toString());
+    }
+    return null;
   }
 
   /** Unbox a wrapper type to its primitive form (used for parameters with a default). */
@@ -318,7 +372,7 @@ public final class OpenApiGenerator {
       return Optional.empty();
     }
     var type = context.javaType(media.mediaType().getSchema());
-    return Optional.of(new ParamDef(bodyName(type), List.of(), type));
+    return Optional.of(new ParamDef(bodyName(type), List.of(), type, false, "null"));
   }
 
   private static String bodyName(JavaType type) {
@@ -567,6 +621,56 @@ public final class OpenApiGenerator {
       source.body.append(param.type().code()).append(' ').append(param.name());
     }
     source.body.append(");\n\n");
+    writeOverloads(source, operation, context);
+  }
+
+  /**
+   * Emit convenience {@code default} method overloads that omit a trailing run of
+   * omittable parameters and delegate to the full abstract method. These are inert to
+   * the Avaje HTTP server/client generators (they carry no HTTP annotation) and exist
+   * purely for caller ergonomics.
+   */
+  private static void writeOverloads(JavaSource source, OperationDef operation, Context context) {
+    if (!context.config.generateOverloads()) {
+      return;
+    }
+    var params = operation.parameters();
+    var trailing = 0;
+    for (var i = params.size() - 1; i >= 0; i--) {
+      if (params.get(i).overloadDrop()) {
+        trailing++;
+      } else {
+        break;
+      }
+    }
+    if (trailing == 0) {
+      return;
+    }
+    var returnCode = operation.returnType().code();
+    var isVoid = "void".equals(returnCode);
+    for (var drop = 1; drop <= trailing; drop++) {
+      var keep = params.size() - drop;
+      source.body.append("  default ").append(returnCode).append(' ').append(operation.methodName()).append('(');
+      for (var i = 0; i < keep; i++) {
+        if (i > 0) {
+          source.body.append(", ");
+        }
+        var param = params.get(i);
+        source.body.append(param.type().code()).append(' ').append(param.name());
+      }
+      source.body.append(") {\n    ");
+      if (!isVoid) {
+        source.body.append("return ");
+      }
+      source.body.append(operation.methodName()).append('(');
+      for (var i = 0; i < params.size(); i++) {
+        if (i > 0) {
+          source.body.append(", ");
+        }
+        source.body.append(i < keep ? params.get(i).name() : params.get(i).dropValue());
+      }
+      source.body.append(");\n  }\n\n");
+    }
   }
 
   private static String annotationImport(String annotation) {
@@ -1017,11 +1121,15 @@ public final class OpenApiGenerator {
     private final String name;
     private final List<String> annotations;
     private final JavaType type;
+    private final boolean overloadDrop;
+    private final String dropValue;
 
-    private ParamDef(String name, List<String> annotations, JavaType type) {
+    private ParamDef(String name, List<String> annotations, JavaType type, boolean overloadDrop, String dropValue) {
       this.name = name;
       this.annotations = annotations;
       this.type = type;
+      this.overloadDrop = overloadDrop;
+      this.dropValue = dropValue;
     }
 
     String name() {
@@ -1034,6 +1142,16 @@ public final class OpenApiGenerator {
 
     JavaType type() {
       return type;
+    }
+
+    /** Whether this parameter may be omitted from a generated convenience overload. */
+    boolean overloadDrop() {
+      return overloadDrop;
+    }
+
+    /** The literal value passed for this parameter when it is omitted from an overload. */
+    String dropValue() {
+      return dropValue;
     }
   }
 
