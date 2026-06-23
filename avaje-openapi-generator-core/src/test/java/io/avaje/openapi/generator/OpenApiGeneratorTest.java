@@ -444,6 +444,53 @@ class OpenApiGeneratorTest {
       .doesNotContain("jakarta.validation.constraints");
   }
 
+  @Test
+  void typeMappingsByFormatTypeAndPrecedence() throws Exception {
+    var input = resourcePath("openapi/typemap.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .typeMappings(java.util.Map.of(
+        "uuid", "com.example.Identifier",
+        "date-time", "java.time.Instant",
+        "string", "com.example.Text"))
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/model/Mapped.java"))
+      .content()
+      // format key (uuid) beats type key (string)
+      .contains("Identifier externalId")
+      .contains("import com.example.Identifier;")
+      .doesNotContain("UUID externalId")
+      // format key date-time overrides the default OffsetDateTime
+      .contains("Instant created")
+      .contains("import java.time.Instant;")
+      // type key applies to a plain string
+      .contains("Text name")
+      .contains("import com.example.Text;")
+      // per-property x-java-type wins over the type mapping
+      .contains("Code code")
+      .contains("import com.example.Code;");
+  }
+
+  @Test
+  void typeMappingsEmptyByDefault() throws Exception {
+    var input = resourcePath("openapi/typemap.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/Mapped.java"))
+      .content()
+      .contains("UUID externalId")
+      .contains("OffsetDateTime created")
+      .contains("String name");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }

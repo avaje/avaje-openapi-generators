@@ -1024,17 +1024,35 @@ public final class OpenApiGenerator {
       }
       switch (Optional.ofNullable(schema.getType()).orElse("object")) {
         case "string":
-          return stringType(schema.getFormat());
+          return mappedType("string", schema.getFormat(), () -> stringType(schema.getFormat()));
         case "integer":
-          return integerType(schema.getFormat());
+          return mappedType("integer", schema.getFormat(), () -> integerType(schema.getFormat()));
         case "number":
-          return numberType(schema.getFormat());
+          return mappedType("number", schema.getFormat(), () -> numberType(schema.getFormat()));
         case "boolean":
-          return JavaType.simple("Boolean");
+          return mappedType("boolean", schema.getFormat(), () -> JavaType.simple("Boolean"));
         case "object":
         default:
           return JavaType.simple("Object");
       }
+    }
+
+    /**
+     * Apply a configured {@code typeMappings} override for the given scalar type and
+     * format, falling back to the built-in resolution. A {@code format} key (e.g.
+     * {@code uuid}) takes precedence over a {@code type} key (e.g. {@code string}).
+     */
+    private JavaType mappedType(String type, String format, java.util.function.Supplier<JavaType> fallback) {
+      var mappings = config.typeMappings();
+      if (!mappings.isEmpty()) {
+        if (format != null && !format.isBlank() && mappings.containsKey(format)) {
+          return javaTypeFromName(mappings.get(format));
+        }
+        if (mappings.containsKey(type)) {
+          return javaTypeFromName(mappings.get(type));
+        }
+      }
+      return fallback.get();
     }
 
     /**

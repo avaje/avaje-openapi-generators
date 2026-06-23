@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -110,6 +111,23 @@ public final class GenerateMojo extends AbstractMojo {
   @Parameter(defaultValue = "org.jspecify.annotations.Nullable")
   private String nullableAnnotation;
 
+  /**
+   * Global type mappings keyed by schema {@code format} (e.g. {@code uuid},
+   * {@code date-time}) or {@code type} (e.g. {@code string}), with fully-qualified
+   * Java type names as values. A {@code format} key takes precedence over a
+   * {@code type} key, and a per-property {@code x-java-type} extension takes
+   * precedence over both.
+   *
+   * <pre>{@code
+   * <typeMappings>
+   *   <uuid>com.example.MyUuid</uuid>
+   *   <date-time>java.time.Instant</date-time>
+   * </typeMappings>
+   * }</pre>
+   */
+  @Parameter
+  private Map<String, String> typeMappings;
+
   /** Clean the generated output directory before generating. */
   @Parameter(defaultValue = "true")
   private boolean cleanOutput;
@@ -145,6 +163,7 @@ public final class GenerateMojo extends AbstractMojo {
       .generateOverloads(generateOverloads)
       .overloadPolicy(overloadPolicy)
       .nullableAnnotation(nullableAnnotation)
+      .typeMappings(typeMappings)
       .build();
 
     var result = new OpenApiGenerator().generate(config);

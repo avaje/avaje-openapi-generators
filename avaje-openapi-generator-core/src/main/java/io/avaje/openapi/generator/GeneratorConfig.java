@@ -3,6 +3,7 @@ package io.avaje.openapi.generator;
 import static java.util.Objects.requireNonNull;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 /** Configuration for OpenAPI to Avaje Java source generation. */
 public final class GeneratorConfig {
@@ -23,6 +24,7 @@ public final class GeneratorConfig {
   private final boolean generateOverloads;
   private final OverloadPolicy overloadPolicy;
   private final String nullableAnnotation;
+  private final Map<String, String> typeMappings;
 
   public GeneratorConfig(
     Path inputSpec,
@@ -40,7 +42,8 @@ public final class GeneratorConfig {
     DateTimeType dateTimeType,
     boolean generateOverloads,
     OverloadPolicy overloadPolicy,
-    String nullableAnnotation) {
+    String nullableAnnotation,
+    Map<String, String> typeMappings) {
 
     this.inputSpec = requireNonNull(inputSpec, "inputSpec");
     this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory");
@@ -61,6 +64,7 @@ public final class GeneratorConfig {
     this.generateOverloads = generateOverloads;
     this.overloadPolicy = overloadPolicy == null ? OverloadPolicy.NULLABLE_ONLY : overloadPolicy;
     this.nullableAnnotation = nullableAnnotation == null ? "" : nullableAnnotation.strip();
+    this.typeMappings = typeMappings == null ? Map.of() : Map.copyOf(typeMappings);
   }
 
   public Path inputSpec() {
@@ -154,6 +158,17 @@ public final class GeneratorConfig {
     return nullableAnnotation;
   }
 
+  /**
+   * Global type mappings keyed by schema {@code format} (e.g. {@code uuid},
+   * {@code date-time}) or {@code type} (e.g. {@code string}), with fully-qualified
+   * Java type names as values. A {@code format} key takes precedence over a
+   * {@code type} key, and a per-property {@code x-java-type} extension takes
+   * precedence over both. Empty by default.
+   */
+  public Map<String, String> typeMappings() {
+    return typeMappings;
+  }
+
   /** Return a builder with required values. */
   public static Builder builder(Path inputSpec, Path outputDirectory, String apiPackage) {
     return new Builder(inputSpec, outputDirectory, apiPackage);
@@ -177,6 +192,7 @@ public final class GeneratorConfig {
     private boolean generateOverloads = false;
     private OverloadPolicy overloadPolicy = OverloadPolicy.NULLABLE_ONLY;
     private String nullableAnnotation = "org.jspecify.annotations.Nullable";
+    private Map<String, String> typeMappings = Map.of();
 
     private Builder(Path inputSpec, Path outputDirectory, String apiPackage) {
       this.inputSpec = inputSpec;
@@ -249,6 +265,11 @@ public final class GeneratorConfig {
       return this;
     }
 
+    public Builder typeMappings(Map<String, String> typeMappings) {
+      this.typeMappings = typeMappings;
+      return this;
+    }
+
     public GeneratorConfig build() {
       return new GeneratorConfig(
         inputSpec,
@@ -266,7 +287,8 @@ public final class GeneratorConfig {
         dateTimeType,
         generateOverloads,
         overloadPolicy,
-        nullableAnnotation);
+        nullableAnnotation,
+        typeMappings);
     }
   }
 }
