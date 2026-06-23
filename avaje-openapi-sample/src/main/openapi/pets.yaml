@@ -66,6 +66,11 @@ paths:
           schema:
             type: integer
             format: int64
+        - name: useMaster
+          in: query
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Pet

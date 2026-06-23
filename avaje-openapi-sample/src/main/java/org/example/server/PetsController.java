@@ -27,7 +27,7 @@ public final class PetsController implements PetsApi {
   }
 
   @Override
-  public Pet getPet(Long id) {
+  public Pet getPet(Long id, boolean useMaster) {
     return new Pet(id, "Dora", Instant.EPOCH);
   }
 }
