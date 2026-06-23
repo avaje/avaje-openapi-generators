@@ -66,6 +66,14 @@ public final class GenerateMojo extends AbstractMojo {
   @Parameter(defaultValue = "true")
   private boolean failOnUnsupported;
 
+  /**
+   * Generate DTO model records and enums. When {@code false} only the API
+   * interfaces are generated and the referenced {@code modelPackage} types are
+   * expected to be provided by an existing module on the classpath.
+   */
+  @Parameter(defaultValue = "true")
+  private boolean generateModels;
+
   /** Clean the generated output directory before generating. */
   @Parameter(defaultValue = "true")
   private boolean cleanOutput;
@@ -96,6 +104,7 @@ public final class GenerateMojo extends AbstractMojo {
       .recordBuilder(generateRecordBuilders)
       .clientAnnotations(generateClientAnnotations)
       .failOnUnsupported(failOnUnsupported)
+      .generateModels(generateModels)
       .build();
 
     var result = new OpenApiGenerator().generate(config);
