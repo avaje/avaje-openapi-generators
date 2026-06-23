@@ -275,7 +275,7 @@ is JSpecify:
 ```java
 import org.jspecify.annotations.Nullable;
 
-List<Pet> listPets(@Nullable @QueryParam("status") PetStatus status);
+List<Pet> listPets(@Nullable @QueryParam PetStatus status);
 ```
 
 JSpecify is already a transitive dependency of `avaje-http-client`. If you only
@@ -317,12 +317,30 @@ parameters:
 generates:
 
 ```java
-Pet getPet(Long id, @QueryParam("useMaster") @Default("false") boolean useMaster);
+Pet getPet(Long id, @QueryParam @Default("false") boolean useMaster);
 ```
 
 Wrapper types `Boolean`, `Integer`, `Long`, `Double` and `Float` are unboxed to
 their primitive form when a default is present. Other types keep their declared
 type and simply gain the `@Default("...")` annotation.
+
+## Parameter names
+
+The value of a location annotation is omitted when the wire name already matches
+the generated Java parameter name, since avaje-http falls back to the parameter
+name when the value is blank:
+
+```java
+// name: status  ->  Java parameter `status`
+List<Pet> listPets(@QueryParam PetStatus status);
+```
+
+When the wire name cannot be a Java identifier (for example a header
+`X-Request-Id`), the explicit value is kept:
+
+```java
+Pet getPet(Long id, @Header("X-Request-Id") String xRequestId);
+```
 
 ## Overloads
 
@@ -372,9 +390,9 @@ For an endpoint `findFleet(fleetGid, useMaster, withMachines, withDrivers)` wher
 its default, the generator emits one overload per trailing suffix length:
 
 ```java
-FleetDetail findFleet(UUID fleetGid, @QueryParam("useMaster") @Default("false") boolean useMaster,
-    @QueryParam("withMachines") @Default("false") boolean withMachines,
-    @QueryParam("withDrivers") @Default("false") boolean withDrivers);
+FleetDetail findFleet(UUID fleetGid, @QueryParam @Default("false") boolean useMaster,
+    @QueryParam @Default("false") boolean withMachines,
+    @QueryParam @Default("false") boolean withDrivers);
 
 default FleetDetail findFleet(UUID fleetGid, boolean useMaster, boolean withMachines) {
   return findFleet(fleetGid, useMaster, withMachines, false);
@@ -431,7 +449,7 @@ Supported:
 - OpenAPI 3 YAML/JSON
 - REST paths and common HTTP methods (with interface `@Path` from `servers` base path + shared path prefix)
 - JSON request/response bodies
-- path/query/header/cookie parameters (with `@Default` for parameter defaults)
+- path/query/header/cookie parameters (with `@Default` for parameter defaults; annotation value omitted when it matches the parameter name)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 - `allOf` composition (members are flattened/merged into a single record)
 - inline object/array/map schemas (extracted into named nested records)
