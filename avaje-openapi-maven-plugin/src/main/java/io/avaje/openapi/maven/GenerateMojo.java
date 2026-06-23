@@ -101,6 +101,15 @@ public final class GenerateMojo extends AbstractMojo {
   @Parameter(defaultValue = "NULLABLE_ONLY")
   private OverloadPolicy overloadPolicy;
 
+  /**
+   * Fully-qualified {@code @Nullable} annotation applied to optional parameters and
+   * {@code nullable: true} model fields. Defaults to
+   * {@code org.jspecify.annotations.Nullable}. Set to blank to disable {@code @Nullable}
+   * generation.
+   */
+  @Parameter(defaultValue = "org.jspecify.annotations.Nullable")
+  private String nullableAnnotation;
+
   /** Clean the generated output directory before generating. */
   @Parameter(defaultValue = "true")
   private boolean cleanOutput;
@@ -135,6 +144,7 @@ public final class GenerateMojo extends AbstractMojo {
       .dateTimeType(dateTimeType)
       .generateOverloads(generateOverloads)
       .overloadPolicy(overloadPolicy)
+      .nullableAnnotation(nullableAnnotation)
       .build();
 
     var result = new OpenApiGenerator().generate(config);

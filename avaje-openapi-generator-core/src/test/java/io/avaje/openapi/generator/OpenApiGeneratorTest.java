@@ -32,11 +32,12 @@ class OpenApiGeneratorTest {
       .contains("@Path(\"/pets\")")
       .contains("@Get")
       .contains("@Post")
-      .contains("List<Pet> listPets(@QueryParam(\"limit\") Integer limit, @QueryParam(\"status\") PetStatus status)")
-      .contains("Stream<Pet> streamPets(@QueryParam(\"status\") PetStatus status)")
+      .contains("List<Pet> listPets(@Nullable @QueryParam(\"limit\") Integer limit, @Nullable @QueryParam(\"status\") PetStatus status)")
+      .contains("Stream<Pet> streamPets(@Nullable @QueryParam(\"status\") PetStatus status)")
       .contains("import java.util.stream.Stream;")
-      .contains("Pet getPet(Long id, @Header(\"X-Request-Id\") String xRequestId, @QueryParam(\"useMaster\") @Default(\"false\") boolean useMaster)")
-      .contains("import io.avaje.http.api.Default;");
+      .contains("Pet getPet(Long id, @Nullable @Header(\"X-Request-Id\") String xRequestId, @QueryParam(\"useMaster\") @Default(\"false\") boolean useMaster)")
+      .contains("import io.avaje.http.api.Default;")
+      .contains("import org.jspecify.annotations.Nullable;");
 
     assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
       .content()
@@ -299,6 +300,74 @@ class OpenApiGeneratorTest {
       // operation-level deprecated -> @Deprecated on the method
       .contains("  @Deprecated")
       .contains(" * List legacy widgets");
+  }
+
+  @Test
+  void nullableAnnotationFromSpec() throws Exception {
+    var input = resourcePath("openapi/nullable.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    // optional (required: false) query param -> @Nullable; path and required params not
+    assertThat(tempDir.resolve("org/example/api/ThingsApi.java"))
+      .content()
+      .contains("import org.jspecify.annotations.Nullable;")
+      .contains("Thing getThing(Long id, @Nullable @QueryParam(\"filter\") String filter, @QueryParam(\"page\") Integer page)");
+
+    // model: nullable:true field -> @Nullable; required+nullable suppresses @NotNull
+    assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
+      .content()
+      .contains("import org.jspecify.annotations.Nullable;")
+      .contains("@NotNull Long id")
+      .contains("@Nullable String code")
+      .contains("@Nullable String note")
+      .doesNotContain("@NotNull String code");
+  }
+
+  @Test
+  void nullableAnnotationDisabledWhenBlank() throws Exception {
+    var input = resourcePath("openapi/nullable.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .nullableAnnotation("")
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/ThingsApi.java"))
+      .content()
+      .doesNotContain("@Nullable")
+      .doesNotContain("org.jspecify");
+
+    // with @Nullable disabled, a required+nullable field falls back to @NotNull
+    assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
+      .content()
+      .doesNotContain("@Nullable")
+      .contains("@NotNull String code");
+  }
+
+  @Test
+  void nullableAnnotationCustomType() throws Exception {
+    var input = resourcePath("openapi/nullable.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .nullableAnnotation("jakarta.annotation.Nullable")
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
+      .content()
+      .contains("import jakarta.annotation.Nullable;")
+      .contains("@Nullable String note")
+      .doesNotContain("org.jspecify");
   }
 
   private static Path resourcePath(String name) throws URISyntaxException {
