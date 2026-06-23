@@ -228,20 +228,64 @@ public final class OpenApiGenerator {
       return List.of();
     }
     var constraints = new ArrayList<String>();
-    if (schema.getMinLength() != null && schema.getMaxLength() != null) {
-      constraints.add("@Size(min = " + schema.getMinLength() + ", max = " + schema.getMaxLength() + ")");
-    } else if (schema.getMinLength() != null) {
-      constraints.add("@Size(min = " + schema.getMinLength() + ")");
-    } else if (schema.getMaxLength() != null) {
-      constraints.add("@Size(max = " + schema.getMaxLength() + ")");
+    // @Size from string length or array item bounds (mutually exclusive by type)
+    var sizeMin = schema.getMinLength() != null ? schema.getMinLength() : schema.getMinItems();
+    var sizeMax = schema.getMaxLength() != null ? schema.getMaxLength() : schema.getMaxItems();
+    if (sizeMin != null && sizeMax != null) {
+      constraints.add("@Size(min = " + sizeMin + ", max = " + sizeMax + ")");
+    } else if (sizeMin != null) {
+      constraints.add("@Size(min = " + sizeMin + ")");
+    } else if (sizeMax != null) {
+      constraints.add("@Size(max = " + sizeMax + ")");
     }
-    if (schema.getMinimum() != null && isWholeNumber(schema.getMinimum())) {
-      constraints.add("@Min(" + schema.getMinimum().longValue() + ")");
+    // numeric lower bound (OAS 3.0 boolean exclusiveMinimum or OAS 3.1 exclusiveMinimumValue)
+    var min = schema.getMinimum();
+    var minExclusive = Boolean.TRUE.equals(schema.getExclusiveMinimum());
+    if (schema.getExclusiveMinimumValue() != null) {
+      min = schema.getExclusiveMinimumValue();
+      minExclusive = true;
     }
-    if (schema.getMaximum() != null && isWholeNumber(schema.getMaximum())) {
-      constraints.add("@Max(" + schema.getMaximum().longValue() + ")");
+    if (min != null) {
+      constraints.add(boundConstraint("Min", min, minExclusive));
+    }
+    // numeric upper bound
+    var max = schema.getMaximum();
+    var maxExclusive = Boolean.TRUE.equals(schema.getExclusiveMaximum());
+    if (schema.getExclusiveMaximumValue() != null) {
+      max = schema.getExclusiveMaximumValue();
+      maxExclusive = true;
+    }
+    if (max != null) {
+      constraints.add(boundConstraint("Max", max, maxExclusive));
+    }
+    if (schema.getPattern() != null) {
+      constraints.add("@Pattern(regexp = \"" + escape(schema.getPattern()) + "\")");
+    }
+    if ("email".equals(schema.getFormat())) {
+      constraints.add("@Email");
     }
     return constraints;
+  }
+
+  /**
+   * Render a numeric bound. Whole-number inclusive bounds use the integral
+   * {@code @Min}/{@code @Max}; decimal or exclusive bounds use
+   * {@code @DecimalMin}/{@code @DecimalMax} (which carry an {@code inclusive} flag).
+   */
+  private static String boundConstraint(String integralName, BigDecimal value, boolean exclusive) {
+    if (!exclusive && isWholeNumber(value)) {
+      return "@" + integralName + "(" + value.longValue() + ")";
+    }
+    var decimalName = "Decimal" + integralName;
+    return exclusive
+      ? "@" + decimalName + "(value = \"" + value.toPlainString() + "\", inclusive = false)"
+      : "@" + decimalName + "(\"" + value.toPlainString() + "\")";
+  }
+
+  /** Extract the annotation simple name from a constraint string, e.g. {@code @Min(1)} -> {@code Min}. */
+  private static String constraintSimpleName(String constraint) {
+    var paren = constraint.indexOf('(');
+    return paren < 0 ? constraint.substring(1) : constraint.substring(1, paren);
   }
 
   private static boolean isWholeNumber(BigDecimal value) {
@@ -629,13 +673,7 @@ public final class OpenApiGenerator {
           source.addImport(context.constraintImport("NotNull"));
         }
         for (var constraint : field.constraints()) {
-          if (constraint.startsWith("@Size")) {
-            source.addImport(context.constraintImport("Size"));
-          } else if (constraint.startsWith("@Min")) {
-            source.addImport(context.constraintImport("Min"));
-          } else if (constraint.startsWith("@Max")) {
-            source.addImport(context.constraintImport("Max"));
-          }
+          source.addImport(context.constraintImport(constraintSimpleName(constraint)));
         }
       }
     }
