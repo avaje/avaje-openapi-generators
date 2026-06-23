@@ -571,6 +571,36 @@ class OpenApiGeneratorTest {
       .doesNotContain("@Json.Ignore");
   }
 
+  @Test
+  void responseHeadersInJavadoc() throws Exception {
+    var input = resourcePath("openapi/response-headers.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/ItemsApi.java"))
+      .content()
+      // listItems: three response headers, two with descriptions, one without
+      .contains("@apiNote Response headers: X-Rate-Limit (integer \u2014 Request limit per hour), X-Rate-Limit-Remaining (integer \u2014 Remaining requests in window), X-Rate-Limit-Reset (string)")
+      // normal method structure preserved
+      .contains("List<Item> listItems()")
+      .contains("Item getItem(Long id)")
+      // getItem has no response headers — @apiNote appears exactly once (for listItems)
+      .containsOnlyOnce("@apiNote Response headers");
+  }
+
+  @Test
+  void responseHeadersAbsentWhenNoDefined() throws Exception {
+    var input = resourcePath("openapi/pets.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
+      .content()
+      .doesNotContain("@apiNote Response headers");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }

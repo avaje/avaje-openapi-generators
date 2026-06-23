@@ -447,7 +447,8 @@ public final class OpenApiGenerator {
       response.streaming(),
       operationDoc(operation),
       Boolean.TRUE.equals(operation.getDeprecated()),
-      response.description());
+      response.description(),
+      responseHeaderDocs(operation));
   }
 
   /** Combine an operation {@code summary} and {@code description} into a Javadoc body. */
@@ -622,6 +623,45 @@ public final class OpenApiGenerator {
       }
     }
     return new ResponseDef(JavaType.simple("void"), 200, APPLICATION_JSON, false, null);
+  }
+
+  /** Collect response header documentation strings from the 2xx response of an operation. */
+  private static List<String> responseHeaderDocs(Operation operation) {
+    var responses = operation.getResponses();
+    if (responses == null) {
+      return List.of();
+    }
+    for (var entry : responses.entrySet()) {
+      var code = parseStatus(entry.getKey());
+      if (code >= 200 && code < 300) {
+        return headerDocs(entry.getValue());
+      }
+    }
+    return List.of();
+  }
+
+  /** Format each response header as {@code "Name (type)"} or {@code "Name (type — description)"}. */
+  private static List<String> headerDocs(ApiResponse response) {
+    if (response == null || response.getHeaders() == null || response.getHeaders().isEmpty()) {
+      return List.of();
+    }
+    var result = new ArrayList<String>();
+    for (var entry : response.getHeaders().entrySet()) {
+      var name = entry.getKey();
+      var header = entry.getValue();
+      var type = "string";
+      if (header.getSchema() != null && header.getSchema().getType() != null) {
+        type = header.getSchema().getType();
+      }
+      var sb = new StringBuilder().append(name).append(" (").append(type);
+      var desc = header.getDescription();
+      if (desc != null && !desc.isBlank()) {
+        sb.append(" \u2014 ").append(firstLine(desc));
+      }
+      sb.append(')');
+      result.add(sb.toString());
+    }
+    return result;
   }
 
   private static ResponseDef readResponse(Context context, int statusCode, ApiResponse response) {
@@ -843,6 +883,9 @@ public final class OpenApiGenerator {
     if (!"void".equals(operation.returnType().code())
       && operation.returnDescription() != null && !operation.returnDescription().isBlank()) {
       docTags.add("@return " + firstLine(operation.returnDescription()));
+    }
+    if (!operation.responseHeaders().isEmpty()) {
+      docTags.add("@apiNote Response headers: " + String.join(", ", operation.responseHeaders()));
     }
     source.body.append(javadoc("  ", operation.description(), docTags));
     if (operation.deprecated()) {
@@ -1465,6 +1508,7 @@ public final class OpenApiGenerator {
     private final String description;
     private final boolean deprecated;
     private final String returnDescription;
+    private final List<String> responseHeaders;
 
     private OperationDef(
       String httpMethod,
@@ -1479,7 +1523,8 @@ public final class OpenApiGenerator {
       boolean streaming,
       String description,
       boolean deprecated,
-      String returnDescription) {
+      String returnDescription,
+      List<String> responseHeaders) {
 
       this.httpMethod = httpMethod;
       this.fullPath = fullPath;
@@ -1494,6 +1539,7 @@ public final class OpenApiGenerator {
       this.description = description;
       this.deprecated = deprecated;
       this.returnDescription = returnDescription;
+      this.responseHeaders = responseHeaders == null ? List.of() : List.copyOf(responseHeaders);
     }
 
     String httpMethod() {
@@ -1548,6 +1594,11 @@ public final class OpenApiGenerator {
       return returnDescription;
     }
 
+    /** Response header names and types documented from the 2xx response definition. */
+    List<String> responseHeaders() {
+      return responseHeaders;
+    }
+
     OperationDef withMethodPath(String methodPath) {
       return new OperationDef(
         httpMethod,
@@ -1562,7 +1613,8 @@ public final class OpenApiGenerator {
         streaming,
         description,
         deprecated,
-        returnDescription);
+        returnDescription,
+        responseHeaders);
     }
   }
 
