@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: Composition API
+  version: 1.0.0
+paths:
+  /pets/{id}:
+    get:
+      tags: [pets]
+      operationId: getPet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+components:
+  schemas:
+    Animal:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+    Dog:
+      allOf:
+        - $ref: '#/components/schemas/Animal'
+        - type: object
+          required: [breed]
+          properties:
+            breed:
+              type: string
+            barkVolume:
+              type: integer
+    Pet:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+        homeAddress:
+          type: object
+          required: [city]
+          properties:
+            city:
+              type: string
+            country:
+              type: object
+              properties:
+                code:
+                  type: string
+                name:
+                  type: string
+        tags:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              score:
+                type: integer
