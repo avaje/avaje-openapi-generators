@@ -261,28 +261,51 @@ public final class OpenApiGenerator {
   private static ParamDef readParameter(Context context, Parameter parameter) {
     var in = Optional.ofNullable(parameter.getIn()).orElse("query").toLowerCase(Locale.ROOT);
     var name = requireNonNull(parameter.getName(), "parameter.name");
-    var type = context.javaType(parameter.getSchema());
+    var schema = parameter.getSchema();
+    var type = context.javaType(schema);
     var javaName = variableName(name);
-    String annotation;
+    var annotations = new ArrayList<String>();
     switch (in) {
       case "path":
-        annotation = null;
         break;
       case "query":
-        annotation = "@QueryParam(\"" + escape(name) + "\")";
+        annotations.add("@QueryParam(\"" + escape(name) + "\")");
         break;
       case "header":
-        annotation = "@Header(\"" + escape(name) + "\")";
+        annotations.add("@Header(\"" + escape(name) + "\")");
         break;
       case "cookie":
-        annotation = "@Cookie(\"" + escape(name) + "\")";
+        annotations.add("@Cookie(\"" + escape(name) + "\")");
         break;
       default:
         context.unsupported("Unsupported parameter location '" + in + "' for parameter " + name);
-        annotation = null;
         break;
     }
-    return new ParamDef(javaName, annotation, type);
+    var defaultValue = schema == null ? null : schema.getDefault();
+    if (defaultValue != null) {
+      annotations.add("@Default(\"" + escape(String.valueOf(defaultValue)) + "\")");
+      // a default guarantees a value, so use the primitive form where applicable
+      type = primitiveType(type);
+    }
+    return new ParamDef(javaName, List.copyOf(annotations), type);
+  }
+
+  /** Unbox a wrapper type to its primitive form (used for parameters with a default). */
+  private static JavaType primitiveType(JavaType type) {
+    switch (type.code()) {
+      case "Boolean":
+        return JavaType.simple("boolean");
+      case "Integer":
+        return JavaType.simple("int");
+      case "Long":
+        return JavaType.simple("long");
+      case "Double":
+        return JavaType.simple("double");
+      case "Float":
+        return JavaType.simple("float");
+      default:
+        return type;
+    }
   }
 
   private static Optional<ParamDef> readBody(Context context, RequestBody requestBody) {
@@ -294,7 +317,7 @@ public final class OpenApiGenerator {
       return Optional.empty();
     }
     var type = context.javaType(media.mediaType().getSchema());
-    return Optional.of(new ParamDef(bodyName(type), null, type));
+    return Optional.of(new ParamDef(bodyName(type), List.of(), type));
   }
 
   private static String bodyName(JavaType type) {
@@ -527,8 +550,8 @@ public final class OpenApiGenerator {
     operation.returnType().imports().forEach(source::addImport);
     for (var param : operation.parameters()) {
       param.type().imports().forEach(source::addImport);
-      if (param.annotation() != null) {
-        source.addImport(annotationImport(param.annotation()));
+      for (var ann : param.annotations()) {
+        source.addImport(annotationImport(ann));
       }
     }
     source.body.append("  ").append(operation.returnType().code()).append(' ').append(operation.methodName()).append('(');
@@ -537,8 +560,8 @@ public final class OpenApiGenerator {
       if (i > 0) {
         source.body.append(", ");
       }
-      if (param.annotation() != null) {
-        source.body.append(param.annotation()).append(' ');
+      for (var ann : param.annotations()) {
+        source.body.append(ann).append(' ');
       }
       source.body.append(param.type().code()).append(' ').append(param.name());
     }
@@ -946,12 +969,12 @@ public final class OpenApiGenerator {
 
   private static final class ParamDef {
     private final String name;
-    private final String annotation;
+    private final List<String> annotations;
     private final JavaType type;
 
-    private ParamDef(String name, String annotation, JavaType type) {
+    private ParamDef(String name, List<String> annotations, JavaType type) {
       this.name = name;
-      this.annotation = annotation;
+      this.annotations = annotations;
       this.type = type;
     }
 
@@ -959,8 +982,8 @@ public final class OpenApiGenerator {
       return name;
     }
 
-    String annotation() {
-      return annotation;
+    List<String> annotations() {
+      return annotations;
     }
 
     JavaType type() {

@@ -79,6 +79,11 @@ paths:
           in: header
           schema:
             type: string
+        - name: useMaster
+          in: query
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Pet

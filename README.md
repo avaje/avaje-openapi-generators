@@ -200,6 +200,31 @@ Add Avaje Validator constraints to the consuming project:
 </dependency>
 ```
 
+## Parameter defaults
+
+When a parameter schema declares a `default`, the generator emits an
+`@Default` annotation alongside the location annotation, and uses the
+**primitive** form of the type (since a default guarantees a value):
+
+```yaml
+parameters:
+  - name: useMaster
+    in: query
+    schema:
+      type: boolean
+      default: false
+```
+
+generates:
+
+```java
+Pet getPet(Long id, @QueryParam("useMaster") @Default("false") boolean useMaster);
+```
+
+Wrapper types `Boolean`, `Integer`, `Long`, `Double` and `Float` are unboxed to
+their primitive form when a default is present. Other types keep their declared
+type and simply gain the `@Default("...")` annotation.
+
 ## Current scope
 
 Supported:
@@ -207,7 +232,7 @@ Supported:
 - OpenAPI 3 YAML/JSON
 - REST paths and common HTTP methods
 - JSON request/response bodies
-- path/query/header/cookie parameters
+- path/query/header/cookie parameters (with `@Default` for parameter defaults)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 
 Unsupported features currently produce diagnostics:

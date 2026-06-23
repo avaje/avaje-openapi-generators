@@ -35,7 +35,8 @@ class OpenApiGeneratorTest {
       .contains("List<Pet> listPets(@QueryParam(\"limit\") Integer limit, @QueryParam(\"status\") PetStatus status)")
       .contains("Stream<Pet> streamPets(@QueryParam(\"status\") PetStatus status)")
       .contains("import java.util.stream.Stream;")
-      .contains("Pet getPet(Long id, @Header(\"X-Request-Id\") String xRequestId)");
+      .contains("Pet getPet(Long id, @Header(\"X-Request-Id\") String xRequestId, @QueryParam(\"useMaster\") @Default(\"false\") boolean useMaster)")
+      .contains("import io.avaje.http.api.Default;");
 
     assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
       .content()
