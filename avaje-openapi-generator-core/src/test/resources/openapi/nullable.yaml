@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: Nullable API
+  version: 1.0.0
+paths:
+  /things/{id}:
+    get:
+      tags: [things]
+      operationId: getThing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+components:
+  schemas:
+    Thing:
+      type: object
+      required: [id, code]
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        name:
+          type: string

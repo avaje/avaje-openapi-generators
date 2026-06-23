@@ -262,6 +262,43 @@ Add Avaje Validator constraints to the consuming project:
 </dependency>
 ```
 
+## Nullable annotations
+
+Optional parameters (`required: false`, without a `default`) and model fields
+declared `nullable: true` are annotated with `@Nullable`. The default annotation
+is JSpecify:
+
+```xml
+<nullableAnnotation>org.jspecify.annotations.Nullable</nullableAnnotation>
+```
+
+```java
+import org.jspecify.annotations.Nullable;
+
+List<Pet> listPets(@Nullable @QueryParam("status") PetStatus status);
+```
+
+JSpecify is already a transitive dependency of `avaje-http-client`. If you only
+depend on `avaje-http-api`, add it to the consuming project:
+
+```xml
+<dependency>
+  <groupId>org.jspecify</groupId>
+  <artifactId>jspecify</artifactId>
+  <version>${jspecify.version}</version>
+</dependency>
+```
+
+Point it at a different annotation (for example `jakarta.annotation.Nullable`), or
+set it blank to disable `@Nullable` generation entirely:
+
+```xml
+<nullableAnnotation></nullableAnnotation>
+```
+
+A field that is both `required` and `nullable: true` is annotated `@Nullable`
+(not `@NotNull`); with `@Nullable` disabled it falls back to `@NotNull`.
+
 ## Parameter defaults
 
 When a parameter schema declares a `default`, the generator emits an
@@ -399,6 +436,7 @@ Supported:
 - `allOf` composition (members are flattened/merged into a single record)
 - inline object/array/map schemas (extracted into named nested records)
 - `description`/`summary` rendered as Javadoc and `deprecated` as `@Deprecated` (schemas, enums, operations, fields, parameters)
+- `@Nullable` on optional parameters and `nullable: true` fields (configurable `nullableAnnotation`)
 - configurable `date-time` Java type (global `dateTimeType`, extended formats, `x-java-type`)
 - convenience `default` method overloads (`generateOverloads`, `overloadPolicy`, `x-overload`)
 

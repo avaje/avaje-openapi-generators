@@ -22,6 +22,7 @@ public final class GeneratorConfig {
   private final DateTimeType dateTimeType;
   private final boolean generateOverloads;
   private final OverloadPolicy overloadPolicy;
+  private final String nullableAnnotation;
 
   public GeneratorConfig(
     Path inputSpec,
@@ -38,7 +39,8 @@ public final class GeneratorConfig {
     boolean generateModels,
     DateTimeType dateTimeType,
     boolean generateOverloads,
-    OverloadPolicy overloadPolicy) {
+    OverloadPolicy overloadPolicy,
+    String nullableAnnotation) {
 
     this.inputSpec = requireNonNull(inputSpec, "inputSpec");
     this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory");
@@ -58,6 +60,7 @@ public final class GeneratorConfig {
     this.dateTimeType = dateTimeType == null ? DateTimeType.OFFSET_DATE_TIME : dateTimeType;
     this.generateOverloads = generateOverloads;
     this.overloadPolicy = overloadPolicy == null ? OverloadPolicy.NULLABLE_ONLY : overloadPolicy;
+    this.nullableAnnotation = nullableAnnotation == null ? "" : nullableAnnotation.strip();
   }
 
   public Path inputSpec() {
@@ -141,6 +144,16 @@ public final class GeneratorConfig {
     return overloadPolicy;
   }
 
+  /**
+   * The fully-qualified {@code @Nullable} annotation applied to optional parameters
+   * and {@code nullable: true} model fields. Defaults to
+   * {@code org.jspecify.annotations.Nullable}. A blank value disables {@code @Nullable}
+   * generation.
+   */
+  public String nullableAnnotation() {
+    return nullableAnnotation;
+  }
+
   /** Return a builder with required values. */
   public static Builder builder(Path inputSpec, Path outputDirectory, String apiPackage) {
     return new Builder(inputSpec, outputDirectory, apiPackage);
@@ -163,6 +176,7 @@ public final class GeneratorConfig {
     private DateTimeType dateTimeType = DateTimeType.OFFSET_DATE_TIME;
     private boolean generateOverloads = false;
     private OverloadPolicy overloadPolicy = OverloadPolicy.NULLABLE_ONLY;
+    private String nullableAnnotation = "org.jspecify.annotations.Nullable";
 
     private Builder(Path inputSpec, Path outputDirectory, String apiPackage) {
       this.inputSpec = inputSpec;
@@ -230,6 +244,11 @@ public final class GeneratorConfig {
       return this;
     }
 
+    public Builder nullableAnnotation(String nullableAnnotation) {
+      this.nullableAnnotation = nullableAnnotation;
+      return this;
+    }
+
     public GeneratorConfig build() {
       return new GeneratorConfig(
         inputSpec,
@@ -246,7 +265,8 @@ public final class GeneratorConfig {
         generateModels,
         dateTimeType,
         generateOverloads,
-        overloadPolicy);
+        overloadPolicy,
+        nullableAnnotation);
     }
   }
 }

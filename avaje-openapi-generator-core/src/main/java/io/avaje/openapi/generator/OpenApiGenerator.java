@@ -175,7 +175,8 @@ public final class OpenApiGenerator {
           context.unsupported("Schema property '" + name + "." + propName + "' needs JSON property mapping");
         }
         var propSchema = entry.getValue();
-        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription()));
+        var fieldNullable = propSchema != null && Boolean.TRUE.equals(propSchema.getNullable());
+        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable));
       }
       var def = new ObjectDef(name, fields, schema.getDescription(), Boolean.TRUE.equals(schema.getDeprecated()));
       add(def);
@@ -412,7 +413,10 @@ public final class OpenApiGenerator {
     }
     var overloadDrop = overloadDrop(context, parameter, in, defaultValue);
     var dropValue = dropValue(type, defaultValue);
-    return new ParamDef(javaName, List.copyOf(annotations), type, overloadDrop, dropValue, parameter.getDescription());
+    var nullable = !"path".equals(in) && defaultValue == null
+      && (!Boolean.TRUE.equals(parameter.getRequired())
+        || (schema != null && Boolean.TRUE.equals(schema.getNullable())));
+    return new ParamDef(javaName, List.copyOf(annotations), type, overloadDrop, dropValue, parameter.getDescription(), nullable);
   }
 
   /**
@@ -494,7 +498,8 @@ public final class OpenApiGenerator {
       return Optional.empty();
     }
     var type = context.javaType(media.mediaType().getSchema());
-    return Optional.of(new ParamDef(bodyName(type), List.of(), type, false, "null", requestBody.getDescription()));
+    var nullable = Boolean.FALSE.equals(requestBody.getRequired());
+    return Optional.of(new ParamDef(bodyName(type), List.of(), type, false, "null", requestBody.getDescription(), nullable));
   }
 
   private static String bodyName(JavaType type) {
@@ -602,8 +607,11 @@ public final class OpenApiGenerator {
     }
     for (var field : object.fields()) {
       field.type().imports().forEach(source::addImport);
+      if (context.nullableEnabled() && field.nullable()) {
+        source.addImport(context.nullableImport());
+      }
       if (context.config.validationAnnotations()) {
-        if (field.required()) {
+        if (field.required() && !field.nullable()) {
           source.addImport(context.constraintImport("NotNull"));
         }
         for (var constraint : field.constraints()) {
@@ -621,7 +629,9 @@ public final class OpenApiGenerator {
     for (var i = 0; i < object.fields().size(); i++) {
       var field = object.fields().get(i);
       source.body.append("  ");
-      if (context.config.validationAnnotations() && field.required()) {
+      if (context.nullableEnabled() && field.nullable()) {
+        source.body.append('@').append(context.nullableSimpleName()).append(' ');
+      } else if (context.config.validationAnnotations() && field.required()) {
         source.body.append("@NotNull ");
       }
       if (context.config.validationAnnotations()) {
@@ -756,6 +766,9 @@ public final class OpenApiGenerator {
     operation.returnType().imports().forEach(source::addImport);
     for (var param : operation.parameters()) {
       param.type().imports().forEach(source::addImport);
+      if (context.nullableEnabled() && param.nullable()) {
+        source.addImport(context.nullableImport());
+      }
       for (var ann : param.annotations()) {
         source.addImport(annotationImport(ann));
       }
@@ -765,6 +778,9 @@ public final class OpenApiGenerator {
       var param = operation.parameters().get(i);
       if (i > 0) {
         source.body.append(", ");
+      }
+      if (context.nullableEnabled() && param.nullable()) {
+        source.body.append('@').append(context.nullableSimpleName()).append(' ');
       }
       for (var ann : param.annotations()) {
         source.body.append(ann).append(' ');
@@ -1066,6 +1082,23 @@ public final class OpenApiGenerator {
     String constraintImport(String simpleName) {
       return config.validationStyle().constraintsPackage() + "." + simpleName;
     }
+
+    /** Whether {@code @Nullable} generation is enabled. */
+    boolean nullableEnabled() {
+      return !config.nullableAnnotation().isBlank();
+    }
+
+    /** The fully-qualified {@code @Nullable} annotation to import. */
+    String nullableImport() {
+      return config.nullableAnnotation();
+    }
+
+    /** The simple name of the configured {@code @Nullable} annotation. */
+    String nullableSimpleName() {
+      var fqn = config.nullableAnnotation();
+      var dot = fqn.lastIndexOf('.');
+      return dot < 0 ? fqn : fqn.substring(dot + 1);
+    }
   }
 
   private static final class JavaSource {
@@ -1144,14 +1177,16 @@ public final class OpenApiGenerator {
     private final boolean required;
     private final List<String> constraints;
     private final String description;
+    private final boolean nullable;
 
-    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description) {
+    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description, boolean nullable) {
       this.javaName = javaName;
       this.jsonName = jsonName;
       this.type = type;
       this.required = required;
       this.constraints = List.copyOf(constraints);
       this.description = description;
+      this.nullable = nullable;
     }
 
     String javaName() {
@@ -1176,6 +1211,10 @@ public final class OpenApiGenerator {
 
     String description() {
       return description;
+    }
+
+    boolean nullable() {
+      return nullable;
     }
   }
 
@@ -1374,14 +1413,16 @@ public final class OpenApiGenerator {
     private final boolean overloadDrop;
     private final String dropValue;
     private final String description;
+    private final boolean nullable;
 
-    private ParamDef(String name, List<String> annotations, JavaType type, boolean overloadDrop, String dropValue, String description) {
+    private ParamDef(String name, List<String> annotations, JavaType type, boolean overloadDrop, String dropValue, String description, boolean nullable) {
       this.name = name;
       this.annotations = annotations;
       this.type = type;
       this.overloadDrop = overloadDrop;
       this.dropValue = dropValue;
       this.description = description;
+      this.nullable = nullable;
     }
 
     String name() {
@@ -1408,6 +1449,10 @@ public final class OpenApiGenerator {
 
     String description() {
       return description;
+    }
+
+    boolean nullable() {
+      return nullable;
     }
   }
 
