@@ -2,6 +2,7 @@ package io.avaje.openapi.maven;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.avaje.openapi.generator.DateTimeType;
 import io.avaje.openapi.generator.GenerationMode;
 import io.avaje.openapi.generator.ValidationStyle;
 import java.lang.reflect.Field;
@@ -32,6 +33,7 @@ class GenerateMojoTest {
     set(mojo, "generateClientAnnotations", true);
     set(mojo, "failOnUnsupported", true);
     set(mojo, "generateModels", true);
+    set(mojo, "dateTimeType", DateTimeType.OFFSET_DATE_TIME);
     set(mojo, "cleanOutput", true);
     set(mojo, "project", project);
 

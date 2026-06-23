@@ -124,6 +124,13 @@ components:
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: instant
+        auditedAt:
+          type: string
+          format: date-time
+          x-java-type: java.time.ZonedDateTime
         birthDate:
           type: string
           format: date

@@ -1,5 +1,6 @@
 package io.avaje.openapi.maven;
 
+import io.avaje.openapi.generator.DateTimeType;
 import io.avaje.openapi.generator.DiagnosticSeverity;
 import io.avaje.openapi.generator.GenerationMode;
 import io.avaje.openapi.generator.GeneratorConfig;
@@ -74,6 +75,15 @@ public final class GenerateMojo extends AbstractMojo {
   @Parameter(defaultValue = "true")
   private boolean generateModels;
 
+  /**
+   * The {@code java.time} type generated for {@code format: date-time} properties.
+   * One of {@code INSTANT}, {@code OFFSET_DATE_TIME} (default), {@code LOCAL_DATE_TIME}
+   * or {@code ZONED_DATE_TIME}. Individual properties can override this via an extended
+   * {@code format} value or the {@code x-java-type} vendor extension.
+   */
+  @Parameter(defaultValue = "OFFSET_DATE_TIME")
+  private DateTimeType dateTimeType;
+
   /** Clean the generated output directory before generating. */
   @Parameter(defaultValue = "true")
   private boolean cleanOutput;
@@ -105,6 +115,7 @@ public final class GenerateMojo extends AbstractMojo {
       .clientAnnotations(generateClientAnnotations)
       .failOnUnsupported(failOnUnsupported)
       .generateModels(generateModels)
+      .dateTimeType(dateTimeType)
       .build();
 
     var result = new OpenApiGenerator().generate(config);

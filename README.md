@@ -247,6 +247,45 @@ Wrapper types `Boolean`, `Integer`, `Long`, `Double` and `Float` are unboxed to
 their primitive form when a default is present. Other types keep their declared
 type and simply gain the `@Default("...")` annotation.
 
+## Date-time types
+
+OpenAPI's `format: date-time` (RFC 3339) carries a timezone offset, so it maps to
+`java.time.OffsetDateTime` by default. Set the global `dateTimeType` to change the
+type used for all `format: date-time` properties:
+
+```xml
+<dateTimeType>INSTANT</dateTimeType>
+<!-- INSTANT | OFFSET_DATE_TIME (default) | LOCAL_DATE_TIME | ZONED_DATE_TIME -->
+```
+
+`format: date` always maps to `java.time.LocalDate`.
+
+### Per-property overrides
+
+Two mechanisms override the global default for an individual property. Precedence,
+highest first:
+
+1. **`x-java-type`** vendor extension — keeps the spec standard and takes any fully
+   qualified class name:
+
+   ```yaml
+   externalLastModified:
+     type: string
+     format: date-time
+     x-java-type: java.time.OffsetDateTime
+   ```
+
+2. **Extended `format` values** — concise shorthand for the common `java.time` types:
+
+   | `format:` value    | Java type                  |
+   | ------------------ | -------------------------- |
+   | `instant`          | `java.time.Instant`        |
+   | `offset-date-time` | `java.time.OffsetDateTime` |
+   | `local-date-time`  | `java.time.LocalDateTime`  |
+   | `zoned-date-time`  | `java.time.ZonedDateTime`  |
+
+3. **Global `dateTimeType`** — applied to plain `format: date-time`.
+
 ## Current scope
 
 Supported:
@@ -256,6 +295,7 @@ Supported:
 - JSON request/response bodies
 - path/query/header/cookie parameters (with `@Default` for parameter defaults)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
+- configurable `date-time` Java type (global `dateTimeType`, extended formats, `x-java-type`)
 
 Unsupported features currently produce diagnostics:
 
