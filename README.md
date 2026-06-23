@@ -341,9 +341,28 @@ public record UserProfile(
 These annotations are only emitted when `generateJsonAnnotations` is `true`
 (the default).
 
+## Response header documentation
 
+OpenAPI response definitions can declare headers that the server will return.
+Since avaje-http has no response-header annotation, these are surfaced as
+`@apiNote` Javadoc tags on the generated method so callers know what to
+expect:
 
-Optional parameters (`required: false`, without a `default`) and model fields
+```java
+/**
+ * List items with rate-limit headers.
+ *
+ * @apiNote Response headers: X-Rate-Limit (integer — Request limit per hour), X-Rate-Limit-Remaining (integer — Remaining requests in window), X-Rate-Limit-Reset (string)
+ */
+@Get
+List<Item> listItems();
+```
+
+Each header entry is formatted as `Name (type)` or `Name (type — description)`
+when a description is present. Headers are only emitted for the 2xx response.
+Operations with no declared response headers produce no `@apiNote`.
+
+ (`required: false`, without a `default`) and model fields
 declared `nullable: true` are annotated with `@Nullable`. The default annotation
 is JSpecify:
 
@@ -558,6 +577,7 @@ Supported:
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 - validation constraints (`@NotNull`, `@Size`, `@Min`/`@Max`, `@DecimalMin`/`@DecimalMax`, `@Pattern`, `@Email`, `@Valid` cascade; Jakarta or Avaje style)
 - `readOnly`/`writeOnly` fields annotated for Avaje Jsonb (`@Json.Ignore`) or Jackson (`@JsonProperty`) via `jsonStyle` config
+- response headers documented as `@apiNote` Javadoc on generated methods
 - `allOf` composition (members are flattened/merged into a single record)
 - inline object/array/map schemas (extracted into named nested records)
 - `description`/`summary` rendered as Javadoc and `deprecated` as `@Deprecated` (schemas, enums, operations, fields, parameters)
