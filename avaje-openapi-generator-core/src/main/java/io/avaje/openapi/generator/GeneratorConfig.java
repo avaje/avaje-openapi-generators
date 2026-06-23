@@ -20,6 +20,8 @@ public final class GeneratorConfig {
   private final boolean failOnUnsupported;
   private final boolean generateModels;
   private final DateTimeType dateTimeType;
+  private final boolean generateOverloads;
+  private final OverloadPolicy overloadPolicy;
 
   public GeneratorConfig(
     Path inputSpec,
@@ -34,7 +36,9 @@ public final class GeneratorConfig {
     boolean clientAnnotations,
     boolean failOnUnsupported,
     boolean generateModels,
-    DateTimeType dateTimeType) {
+    DateTimeType dateTimeType,
+    boolean generateOverloads,
+    OverloadPolicy overloadPolicy) {
 
     this.inputSpec = requireNonNull(inputSpec, "inputSpec");
     this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory");
@@ -52,6 +56,8 @@ public final class GeneratorConfig {
     this.failOnUnsupported = failOnUnsupported;
     this.generateModels = generateModels;
     this.dateTimeType = dateTimeType == null ? DateTimeType.OFFSET_DATE_TIME : dateTimeType;
+    this.generateOverloads = generateOverloads;
+    this.overloadPolicy = overloadPolicy == null ? OverloadPolicy.NULLABLE_ONLY : overloadPolicy;
   }
 
   public Path inputSpec() {
@@ -117,6 +123,24 @@ public final class GeneratorConfig {
     return dateTimeType;
   }
 
+  /**
+   * When {@code true}, generate convenience {@code default} method overloads that omit
+   * a trailing run of omittable parameters and delegate to the full method. Defaults to
+   * {@code false}.
+   */
+  public boolean generateOverloads() {
+    return generateOverloads;
+  }
+
+  /**
+   * Policy deciding which trailing parameters are omittable when generating overloads.
+   * Defaults to {@link OverloadPolicy#NULLABLE_ONLY}. Only applies when
+   * {@link #generateOverloads()} is {@code true}.
+   */
+  public OverloadPolicy overloadPolicy() {
+    return overloadPolicy;
+  }
+
   /** Return a builder with required values. */
   public static Builder builder(Path inputSpec, Path outputDirectory, String apiPackage) {
     return new Builder(inputSpec, outputDirectory, apiPackage);
@@ -137,6 +161,8 @@ public final class GeneratorConfig {
     private boolean failOnUnsupported = true;
     private boolean generateModels = true;
     private DateTimeType dateTimeType = DateTimeType.OFFSET_DATE_TIME;
+    private boolean generateOverloads = false;
+    private OverloadPolicy overloadPolicy = OverloadPolicy.NULLABLE_ONLY;
 
     private Builder(Path inputSpec, Path outputDirectory, String apiPackage) {
       this.inputSpec = inputSpec;
@@ -194,6 +220,16 @@ public final class GeneratorConfig {
       return this;
     }
 
+    public Builder generateOverloads(boolean generateOverloads) {
+      this.generateOverloads = generateOverloads;
+      return this;
+    }
+
+    public Builder overloadPolicy(OverloadPolicy overloadPolicy) {
+      this.overloadPolicy = overloadPolicy;
+      return this;
+    }
+
     public GeneratorConfig build() {
       return new GeneratorConfig(
         inputSpec,
@@ -208,7 +244,9 @@ public final class GeneratorConfig {
         clientAnnotations,
         failOnUnsupported,
         generateModels,
-        dateTimeType);
+        dateTimeType,
+        generateOverloads,
+        overloadPolicy);
     }
   }
 }

@@ -5,6 +5,7 @@ import io.avaje.openapi.generator.DiagnosticSeverity;
 import io.avaje.openapi.generator.GenerationMode;
 import io.avaje.openapi.generator.GeneratorConfig;
 import io.avaje.openapi.generator.OpenApiGenerator;
+import io.avaje.openapi.generator.OverloadPolicy;
 import io.avaje.openapi.generator.ValidationStyle;
 import java.io.File;
 import java.io.IOException;
@@ -84,6 +85,22 @@ public final class GenerateMojo extends AbstractMojo {
   @Parameter(defaultValue = "OFFSET_DATE_TIME")
   private DateTimeType dateTimeType;
 
+  /**
+   * Generate convenience {@code default} method overloads that omit a trailing run of
+   * omittable parameters and delegate to the full method. Defaults to {@code false}.
+   */
+  @Parameter(defaultValue = "false")
+  private boolean generateOverloads;
+
+  /**
+   * Policy deciding which trailing parameters are omittable when {@code generateOverloads}
+   * is enabled. One of {@code EXPLICIT}, {@code NULLABLE_ONLY} (default) or
+   * {@code ALL_OPTIONAL}. A per-parameter {@code x-overload} vendor extension overrides
+   * the policy for that parameter.
+   */
+  @Parameter(defaultValue = "NULLABLE_ONLY")
+  private OverloadPolicy overloadPolicy;
+
   /** Clean the generated output directory before generating. */
   @Parameter(defaultValue = "true")
   private boolean cleanOutput;
@@ -116,6 +133,8 @@ public final class GenerateMojo extends AbstractMojo {
       .failOnUnsupported(failOnUnsupported)
       .generateModels(generateModels)
       .dateTimeType(dateTimeType)
+      .generateOverloads(generateOverloads)
+      .overloadPolicy(overloadPolicy)
       .build();
 
     var result = new OpenApiGenerator().generate(config);

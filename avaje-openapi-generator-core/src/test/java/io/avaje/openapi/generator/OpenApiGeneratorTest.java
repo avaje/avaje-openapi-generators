@@ -138,6 +138,51 @@ class OpenApiGeneratorTest {
       .doesNotContain("OffsetDateTime");
   }
 
+  @Test
+  void generateOverloadsNullableOnlyWithExplicitOverride() throws Exception {
+    var input = resourcePath("openapi/pets.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .generateOverloads(true)
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
+      .content()
+      // NULLABLE_ONLY: both optional no-default params are a trailing droppable run
+      .contains("default List<Pet> listPets(Integer limit) {")
+      .contains("return listPets(limit, null);")
+      .contains("default List<Pet> listPets() {")
+      .contains("return listPets(null, null);")
+      // streaming endpoint gets a no-arg overload
+      .contains("default Stream<Pet> streamPets() {")
+      .contains("return streamPets(null);")
+      // x-overload: true makes the defaulted useMaster droppable (passes its default);
+      // x-overload: false on the header stops the trailing run, so only useMaster drops
+      .contains("default Pet getPet(Long id, String xRequestId) {")
+      .contains("return getPet(id, xRequestId, false);")
+      .doesNotContain("default Pet getPet(Long id) {");
+  }
+
+  @Test
+  void noOverloadsByDefault() throws Exception {
+    var input = resourcePath("openapi/pets.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+    assertThat(tempDir.resolve("org/example/api/PetsApi.java"))
+      .content()
+      .doesNotContain("default ");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }

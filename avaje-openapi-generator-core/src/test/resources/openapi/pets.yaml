@@ -77,10 +77,12 @@ paths:
             format: int64
         - name: X-Request-Id
           in: header
+          x-overload: false
           schema:
             type: string
         - name: useMaster
           in: query
+          x-overload: true
           schema:
             type: boolean
             default: false
