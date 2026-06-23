@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: TypeMapping API
+  version: 1.0.0
+paths:
+  /mapped:
+    get:
+      tags: [mapped]
+      operationId: listMapped
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mapped'
+components:
+  schemas:
+    Mapped:
+      type: object
+      properties:
+        externalId:
+          type: string
+          format: uuid
+        created:
+          type: string
+          format: date-time
+        name:
+          type: string
+        code:
+          type: string
+          x-java-type: com.example.Code

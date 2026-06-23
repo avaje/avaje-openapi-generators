@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -442,6 +443,53 @@ class OpenApiGeneratorTest {
       .contains("import io.avaje.validation.constraints.DecimalMin;")
       .contains("import io.avaje.validation.constraints.DecimalMax;")
       .doesNotContain("jakarta.validation.constraints");
+  }
+
+  @Test
+  void typeMappingsByFormatTypeAndPrecedence() throws Exception {
+    var input = resourcePath("openapi/typemap.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .typeMappings(Map.of(
+        "uuid", "com.example.Identifier",
+        "date-time", "java.time.Instant",
+        "string", "com.example.Text"))
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/model/Mapped.java"))
+      .content()
+      // format key (uuid) beats type key (string)
+      .contains("Identifier externalId")
+      .contains("import com.example.Identifier;")
+      .doesNotContain("UUID externalId")
+      // format key date-time overrides the default OffsetDateTime
+      .contains("Instant created")
+      .contains("import java.time.Instant;")
+      // type key applies to a plain string
+      .contains("Text name")
+      .contains("import com.example.Text;")
+      // per-property x-java-type wins over the type mapping
+      .contains("Code code")
+      .contains("import com.example.Code;");
+  }
+
+  @Test
+  void typeMappingsEmptyByDefault() throws Exception {
+    var input = resourcePath("openapi/typemap.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/Mapped.java"))
+      .content()
+      .contains("UUID externalId")
+      .contains("OffsetDateTime created")
+      .contains("String name");
   }
 
   private static Path resourcePath(String name) throws URISyntaxException {

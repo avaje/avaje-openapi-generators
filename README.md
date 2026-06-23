@@ -461,6 +461,32 @@ highest first:
 
 3. **Global `dateTimeType`** — applied to plain `format: date-time`.
 
+## Type mappings
+
+`typeMappings` globally overrides the Java type generated for a schema `format` or
+`type`, without editing each schema. Keys are a schema `format` (e.g. `uuid`,
+`date-time`, `binary`) or a bare `type` (e.g. `string`); values are fully-qualified
+Java type names:
+
+```xml
+<typeMappings>
+  <uuid>com.example.MyUuid</uuid>
+  <date-time>java.time.Instant</date-time>
+</typeMappings>
+```
+
+Precedence, highest first:
+
+1. per-property `x-java-type` vendor extension
+2. `typeMappings` entry keyed by `format`
+3. `typeMappings` entry keyed by `type`
+4. the built-in default type
+
+So given the mappings above, `{ type: string, format: uuid }` becomes
+`com.example.MyUuid`, and a plain `{ type: string }` keeps `String` unless a
+`string` key is also configured. The import is derived from the fully-qualified
+value (`java.lang` and unqualified names are emitted without an import).
+
 ## Current scope
 
 Supported:
@@ -476,6 +502,7 @@ Supported:
 - `description`/`summary` rendered as Javadoc and `deprecated` as `@Deprecated` (schemas, enums, operations, fields, parameters)
 - `@Nullable` on optional parameters and `nullable: true` fields (configurable `nullableAnnotation`)
 - configurable `date-time` Java type (global `dateTimeType`, extended formats, `x-java-type`)
+- global `typeMappings` (override the Java type for a schema `format` or `type`)
 - convenience `default` method overloads (`generateOverloads`, `overloadPolicy`, `x-overload`)
 
 Unsupported features currently produce diagnostics:
