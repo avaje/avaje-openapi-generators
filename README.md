@@ -178,6 +178,46 @@ conventions) and should remain the single source of truth — the OpenAPI spec
 then defines only the operations, and the DTO schemas exist purely so the
 generated interface signatures resolve to those existing types.
 
+## Interface path (`@Path`)
+
+The class-level `@Path` on each generated interface is derived from two sources,
+concatenated:
+
+1. the **path component of the first `servers` URL**, then
+2. the longest **literal path prefix** shared by every operation in that interface
+   (i.e. the leading path segments common to all operations, stopping at the first
+   path variable).
+
+```yaml
+servers:
+  - url: https://api.example.com/v1   # absolute URL, or a relative "/v1"
+paths:
+  /pets/{id}: { get: { tags: [store], ... } }
+  /owners/{id}: { get: { tags: [store], ... } }
+```
+
+generates:
+
+```java
+@Path("/v1")
+public interface StoreApi {
+  @Get("/pets/{id}")
+  Pet getPet(Long id);
+
+  @Get("/owners/{id}")
+  Owner getOwner(Long id);
+}
+```
+
+The `servers` URL may be absolute (`https://host/v1`) or a root-relative path
+(`/v1`); only its path component is used, a trailing `/` is trimmed, and a bare
+`/` contributes nothing. Server URLs containing template variables
+(`https://{host}/v1`) cannot form a static prefix and are ignored with a warning.
+
+Equivalently, you can omit `servers` and put the version directly in the paths
+(`/v1/pets/{id}`, `/v1/owners/{id}`); the shared `/v1` segment is then picked up
+by the common-prefix step and produces the same `@Path("/v1")`.
+
 ## Validation annotations
 
 Validation annotations are enabled by default:
@@ -352,7 +392,7 @@ highest first:
 Supported:
 
 - OpenAPI 3 YAML/JSON
-- REST paths and common HTTP methods
+- REST paths and common HTTP methods (with interface `@Path` from `servers` base path + shared path prefix)
 - JSON request/response bodies
 - path/query/header/cookie parameters (with `@Default` for parameter defaults)
 - component object schemas, enums, arrays, maps, date/time/UUID formats

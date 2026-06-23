@@ -1,0 +1,59 @@
+openapi: 3.0.3
+info:
+  title: Versioned API
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /pets/{id}:
+    get:
+      tags:
+        - store
+      operationId: getPet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Pet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+  /owners/{id}:
+    get:
+      tags:
+        - store
+      operationId: getOwner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Owner'
+components:
+  schemas:
+    Pet:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+    Owner:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
