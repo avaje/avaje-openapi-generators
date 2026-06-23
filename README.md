@@ -276,10 +276,30 @@ Schema keywords map to constraint annotations on the generated record components
 | `exclusiveMinimum` / `exclusiveMaximum` | `@DecimalMin` / `@DecimalMax` with `inclusive = false` |
 | `pattern` | `@Pattern(regexp = ...)` |
 | `format: email` | `@Email` |
+| object / array-of / map-of a generated model | `@Valid` |
 
 Both OpenAPI 3.0 (`exclusiveMinimum: true`) and 3.1 (`exclusiveMinimum: <number>`)
 exclusive-bound forms are honoured. `multipleOf` has no Bean Validation equivalent
 and is not mapped.
+
+### Nested validation
+
+Record components whose type is a generated model — directly, or as the element of
+a `List`/`Map` — are annotated `@Valid` so Bean Validation cascades into them:
+
+```java
+public record Order(
+  @NotNull @Valid Customer customer,
+  @Valid List<Item> items,
+  @Valid Map<String, Item> attachments,
+  List<String> labels,
+  OrderStatus status
+) {}
+```
+
+References to enums and scalar types are not cascaded. Jakarta places `@Valid` in
+the root `jakarta.validation` package; the Avaje style uses
+`io.avaje.validation.constraints.Valid`.
 
 ## Nullable annotations
 
@@ -496,7 +516,7 @@ Supported:
 - JSON request/response bodies
 - path/query/header/cookie parameters (with `@Default` for parameter defaults; annotation value omitted when it matches the parameter name)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
-- validation constraints (`@NotNull`, `@Size`, `@Min`/`@Max`, `@DecimalMin`/`@DecimalMax`, `@Pattern`, `@Email`; Jakarta or Avaje style)
+- validation constraints (`@NotNull`, `@Size`, `@Min`/`@Max`, `@DecimalMin`/`@DecimalMax`, `@Pattern`, `@Email`, `@Valid` cascade; Jakarta or Avaje style)
 - `allOf` composition (members are flattened/merged into a single record)
 - inline object/array/map schemas (extracted into named nested records)
 - `description`/`summary` rendered as Javadoc and `deprecated` as `@Deprecated` (schemas, enums, operations, fields, parameters)

@@ -492,6 +492,48 @@ class OpenApiGeneratorTest {
       .contains("String name");
   }
 
+  @Test
+  void validCascadeOnModelFields() throws Exception {
+    var input = resourcePath("openapi/valid.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/model/Order.java"))
+      .content()
+      .contains("import jakarta.validation.Valid;")
+      // object ref (also required, so @NotNull first)
+      .contains("@NotNull @Valid Customer customer")
+      // array of model refs
+      .contains("@Valid List<Item> items")
+      // map of model refs
+      .contains("@Valid Map<String, Item> attachments")
+      // array of scalars, enum ref and plain string do NOT cascade
+      .contains("List<String> labels")
+      .doesNotContain("@Valid List<String>")
+      .doesNotContain("@Valid OrderStatus")
+      .doesNotContain("@Valid String note");
+  }
+
+  @Test
+  void validCascadeAvajeStyleImport() throws Exception {
+    var input = resourcePath("openapi/valid.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .validationStyle(ValidationStyle.AVAJE)
+      .build();
+
+    new OpenApiGenerator().generate(config);
+
+    assertThat(tempDir.resolve("org/example/api/model/Order.java"))
+      .content()
+      .contains("import io.avaje.validation.constraints.Valid;")
+      .doesNotContain("jakarta.validation");
+  }
+
   private static Path resourcePath(String name) throws URISyntaxException {
     return Path.of(OpenApiGeneratorTest.class.getClassLoader().getResource(name).toURI());
   }
