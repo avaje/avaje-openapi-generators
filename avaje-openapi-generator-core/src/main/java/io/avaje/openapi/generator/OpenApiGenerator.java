@@ -177,7 +177,7 @@ public final class OpenApiGenerator {
         }
         var propSchema = entry.getValue();
         var fieldNullable = propSchema != null && Boolean.TRUE.equals(propSchema.getNullable());
-        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable));
+        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable, needsValid(propSchema)));
       }
       var def = new ObjectDef(name, fields, schema.getDescription(), Boolean.TRUE.equals(schema.getDeprecated()));
       add(def);
@@ -221,6 +221,42 @@ public final class OpenApiGenerator {
         context.unsupported("Could not resolve $ref '" + ref + "'");
       }
       return target;
+    }
+
+    /**
+     * Whether a property type cascades validation with {@code @Valid}: a reference to
+     * a generated object model, an inline object, or an array/map whose element is one.
+     * Enum and scalar references do not.
+     */
+    private boolean needsValid(Schema<?> schema) {
+      if (schema == null) {
+        return false;
+      }
+      if (schema.get$ref() != null) {
+        return isObjectModel(resolveRef(schema));
+      }
+      if (schema instanceof ArraySchema || "array".equals(schema.getType())) {
+        return needsValid(schema.getItems());
+      }
+      if (schema.getAdditionalProperties() instanceof Schema<?>) {
+        return needsValid((Schema<?>) schema.getAdditionalProperties());
+      }
+      return isObjectModel(schema);
+    }
+
+    /** Whether a (resolved) schema generates a record model rather than an enum or scalar. */
+    private boolean isObjectModel(Schema<?> schema) {
+      if (schema == null || schema.getEnum() != null) {
+        return false;
+      }
+      if (schema.get$ref() != null) {
+        return isObjectModel(resolveRef(schema));
+      }
+      return schema.getProperties() != null
+        || "object".equals(schema.getType())
+        || schema.getAllOf() != null
+        || schema.getOneOf() != null
+        || schema.getAnyOf() != null;
     }
   }
 
@@ -673,6 +709,9 @@ public final class OpenApiGenerator {
         if (field.required() && !field.nullable()) {
           source.addImport(context.constraintImport("NotNull"));
         }
+        if (field.validate()) {
+          source.addImport(context.validImport());
+        }
         for (var constraint : field.constraints()) {
           source.addImport(context.constraintImport(constraintSimpleName(constraint)));
         }
@@ -686,6 +725,9 @@ public final class OpenApiGenerator {
         source.body.append('@').append(context.nullableSimpleName()).append(' ');
       } else if (context.config.validationAnnotations() && field.required()) {
         source.body.append("@NotNull ");
+      }
+      if (context.config.validationAnnotations() && field.validate()) {
+        source.body.append("@Valid ");
       }
       if (context.config.validationAnnotations()) {
         for (var constraint : field.constraints()) {
@@ -1154,6 +1196,11 @@ public final class OpenApiGenerator {
       return config.validationStyle().constraintsPackage() + "." + simpleName;
     }
 
+    /** Fully-qualified {@code @Valid} import for the configured validation style. */
+    String validImport() {
+      return config.validationStyle().validClass();
+    }
+
     /** Whether {@code @Nullable} generation is enabled. */
     boolean nullableEnabled() {
       return !config.nullableAnnotation().isBlank();
@@ -1249,8 +1296,9 @@ public final class OpenApiGenerator {
     private final List<String> constraints;
     private final String description;
     private final boolean nullable;
+    private final boolean validate;
 
-    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description, boolean nullable) {
+    private FieldDef(String javaName, String jsonName, JavaType type, boolean required, List<String> constraints, String description, boolean nullable, boolean validate) {
       this.javaName = javaName;
       this.jsonName = jsonName;
       this.type = type;
@@ -1258,6 +1306,7 @@ public final class OpenApiGenerator {
       this.constraints = List.copyOf(constraints);
       this.description = description;
       this.nullable = nullable;
+      this.validate = validate;
     }
 
     String javaName() {
@@ -1286,6 +1335,11 @@ public final class OpenApiGenerator {
 
     boolean nullable() {
       return nullable;
+    }
+
+    /** Whether the field type is a generated model and should cascade with {@code @Valid}. */
+    boolean validate() {
+      return validate;
     }
   }
 
