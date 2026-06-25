@@ -179,7 +179,13 @@ public final class OpenApiGenerator {
         var fieldNullable = propSchema != null && Boolean.TRUE.equals(propSchema.getNullable());
         var fieldReadOnly = propSchema != null && Boolean.TRUE.equals(propSchema.getReadOnly());
         var fieldWriteOnly = propSchema != null && Boolean.TRUE.equals(propSchema.getWriteOnly());
-        fields.add(new FieldDef(variableName(propName), propName, context.javaType(propSchema), required.contains(propName), constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable, needsValid(propSchema), fieldReadOnly, fieldWriteOnly));
+        var fieldRequired = required.contains(propName);
+        var fieldType = context.javaType(propSchema);
+        // a required, non-nullable scalar is guaranteed present and non-null, so use the primitive form
+        if (fieldRequired && !fieldNullable) {
+          fieldType = primitiveType(fieldType);
+        }
+        fields.add(new FieldDef(variableName(propName), propName, fieldType, fieldRequired, constraints(propSchema), propSchema == null ? null : propSchema.getDescription(), fieldNullable, needsValid(propSchema), fieldReadOnly, fieldWriteOnly));
       }
       var def = new ObjectDef(name, fields, schema.getDescription(), Boolean.TRUE.equals(schema.getDeprecated()));
       add(def);
@@ -587,6 +593,23 @@ public final class OpenApiGenerator {
     }
   }
 
+  /** Whether the Java type is a primitive (and therefore intrinsically non-null). */
+  private static boolean isPrimitive(JavaType type) {
+    switch (type.code()) {
+      case "boolean":
+      case "byte":
+      case "short":
+      case "char":
+      case "int":
+      case "long":
+      case "float":
+      case "double":
+        return true;
+      default:
+        return false;
+    }
+  }
+
   private static Optional<ParamDef> readBody(Context context, RequestBody requestBody) {
     if (requestBody == null) {
       return Optional.empty();
@@ -748,7 +771,7 @@ public final class OpenApiGenerator {
         source.addImport(context.nullableImport());
       }
       if (context.config.validationAnnotations()) {
-        if (field.required() && !field.nullable()) {
+        if (field.required() && !field.nullable() && !isPrimitive(field.type())) {
           source.addImport(context.constraintImport("NotNull"));
         }
         if (field.validate()) {
@@ -771,7 +794,7 @@ public final class OpenApiGenerator {
       source.body.append("  ");
       if (context.nullableEnabled() && field.nullable()) {
         source.body.append('@').append(context.nullableSimpleName()).append(' ');
-      } else if (context.config.validationAnnotations() && field.required()) {
+      } else if (context.config.validationAnnotations() && field.required() && !isPrimitive(field.type())) {
         source.body.append("@NotNull ");
       }
       if (context.config.validationAnnotations() && field.validate()) {

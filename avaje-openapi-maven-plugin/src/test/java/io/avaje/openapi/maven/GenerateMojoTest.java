@@ -44,6 +44,9 @@ class GenerateMojoTest {
       .content()
       .contains("@RecordBuilder")
       .contains("import io.avaje.validation.constraints.NotNull;")
+      .contains("@NotNull String name")
+      .contains("long id")
+      .doesNotContain("@NotNull Long id")
       .contains("public static PetBuilder builder()");
     assertThat(project.getCompileSourceRoots()).contains(output.toAbsolutePath().toString());
   }

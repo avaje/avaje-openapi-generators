@@ -48,7 +48,7 @@ class OpenApiGeneratorTest {
       .content()
       .doesNotContain("@RecordBuilder")
       .contains("@Json")
-      .contains("@NotNull @Min(1) Long id")
+      .contains("@Min(1) long id")
       .contains("@NotNull @Size(min = 1, max = 100) String name")
       .contains("OffsetDateTime createdAt")
       .contains("Instant updatedAt")
@@ -91,6 +91,39 @@ class OpenApiGeneratorTest {
       .content()
       .doesNotContain("@RecordBuilder")
       .doesNotContain("builder()");
+  }
+
+  @Test
+  void requiredNonNullableScalarsUsePrimitives() throws Exception {
+    var input = resourcePath("openapi/primitives.yaml");
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api").build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/model/Sample.java"))
+      .content()
+      // required + non-nullable scalars -> primitive, with no redundant @NotNull
+      .contains("int reqInt")
+      .contains("long reqLong")
+      .contains("boolean reqBool")
+      .contains("double reqDouble")
+      .doesNotContain("@NotNull int")
+      .doesNotContain("@NotNull long")
+      .doesNotContain("@NotNull boolean")
+      .doesNotContain("@NotNull double")
+      // required reference types keep @NotNull (no primitive form)
+      .contains("@NotNull BigDecimal reqDecimal")
+      .contains("@NotNull String reqString")
+      // required + nullable stays boxed (must be able to hold null)
+      .contains("@Nullable Integer reqNullableInt")
+      .doesNotContain("int reqNullableInt")
+      // optional (not required) stays boxed
+      .contains("Integer optInt")
+      .contains("Boolean optBool");
   }
 
   @Test
@@ -234,7 +267,8 @@ class OpenApiGeneratorTest {
     assertThat(tempDir.resolve("org/example/api/model/Dog.java"))
       .content()
       .contains("public record Dog(")
-      .contains("@NotNull Long id")
+      .contains("long id")
+      .doesNotContain("@NotNull Long id")
       .contains("String name")
       .contains("@NotNull String breed")
       .contains("Integer barkVolume");
@@ -242,7 +276,8 @@ class OpenApiGeneratorTest {
     // inline object property, array-of-inline-object, map-of-inline-object
     assertThat(tempDir.resolve("org/example/api/model/Pet.java"))
       .content()
-      .contains("@NotNull Long id")
+      .contains("long id")
+      .doesNotContain("@NotNull Long id")
       .contains("PetHomeAddress homeAddress")
       .contains("List<PetTags> tags")
       .contains("Map<String, PetMetadata> metadata");
@@ -324,7 +359,8 @@ class OpenApiGeneratorTest {
     assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
       .content()
       .contains("import org.jspecify.annotations.Nullable;")
-      .contains("@NotNull Long id")
+      .contains("long id")
+      .doesNotContain("@NotNull Long id")
       .contains("@Nullable String code")
       .contains("@Nullable String note")
       .doesNotContain("@NotNull String code");
