@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: Primitives API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Sample:
+      type: object
+      required:
+        - reqInt
+        - reqLong
+        - reqBool
+        - reqDouble
+        - reqDecimal
+        - reqString
+        - reqNullableInt
+      properties:
+        reqInt:
+          type: integer
+        reqLong:
+          type: integer
+          format: int64
+        reqBool:
+          type: boolean
+        reqDouble:
+          type: number
+          format: double
+        reqDecimal:
+          type: number
+        reqString:
+          type: string
+        reqNullableInt:
+          type: integer
+          nullable: true
+        optInt:
+          type: integer
+        optBool:
+          type: boolean

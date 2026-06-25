@@ -373,7 +373,7 @@ is JSpecify:
 ```java
 import org.jspecify.annotations.Nullable;
 
-List<Pet> listPets(@Nullable @QueryParam PetStatus status);
+List<Pet> listPets(@Nullable @QueryParam("status") PetStatus status);
 ```
 
 JSpecify is already a transitive dependency of `avaje-http-client`. If you only
@@ -415,7 +415,7 @@ parameters:
 generates:
 
 ```java
-Pet getPet(Long id, @QueryParam @Default("false") boolean useMaster);
+Pet getPet(Long id, @QueryParam("useMaster") @Default("false") boolean useMaster);
 ```
 
 Wrapper types `Boolean`, `Integer`, `Long`, `Double` and `Float` are unboxed to
@@ -424,21 +424,22 @@ type and simply gain the `@Default("...")` annotation.
 
 ## Parameter names
 
-The value of a location annotation is omitted when the wire name already matches
-the generated Java parameter name, since avaje-http falls back to the parameter
-name when the value is blank:
+Each `@QueryParam` / `@Header` / `@Cookie` is always generated with an explicit
+wire-name value:
 
 ```java
-// name: status  ->  Java parameter `status`
-List<Pet> listPets(@QueryParam PetStatus status);
-```
+List<Pet> listPets(@QueryParam("status") PetStatus status);
 
-When the wire name cannot be a Java identifier (for example a header
-`X-Request-Id`), the explicit value is kept:
-
-```java
 Pet getPet(Long id, @Header("X-Request-Id") String xRequestId);
 ```
+
+The explicit name keeps the generated interface robust as a contract-first
+artifact. avaje-http can fall back to the Java parameter name when the annotation
+value is blank, but that fallback only works when parameter names are present in
+the bytecode — which is **not** the case for an interface consumed from a
+precompiled jar via `@Client.Import` unless that jar was compiled with
+`-parameters`. Emitting the name explicitly removes that requirement so consumers
+need no special compiler configuration.
 
 ## Overloads
 
@@ -488,9 +489,9 @@ For an endpoint `findFleet(fleetGid, useMaster, withMachines, withDrivers)` wher
 its default, the generator emits one overload per trailing suffix length:
 
 ```java
-FleetDetail findFleet(UUID fleetGid, @QueryParam @Default("false") boolean useMaster,
-    @QueryParam @Default("false") boolean withMachines,
-    @QueryParam @Default("false") boolean withDrivers);
+FleetDetail findFleet(UUID fleetGid, @QueryParam("useMaster") @Default("false") boolean useMaster,
+    @QueryParam("withMachines") @Default("false") boolean withMachines,
+    @QueryParam("withDrivers") @Default("false") boolean withDrivers);
 
 default FleetDetail findFleet(UUID fleetGid, boolean useMaster, boolean withMachines) {
   return findFleet(fleetGid, useMaster, withMachines, false);
@@ -573,7 +574,7 @@ Supported:
 - OpenAPI 3 YAML/JSON
 - REST paths and common HTTP methods (with interface `@Path` from `servers` base path + shared path prefix)
 - JSON request/response bodies
-- path/query/header/cookie parameters (with `@Default` for parameter defaults; annotation value omitted when it matches the parameter name)
+- path/query/header/cookie parameters (with `@Default` for parameter defaults; location annotations always carry an explicit wire-name value)
 - component object schemas, enums, arrays, maps, date/time/UUID formats
 - validation constraints (`@NotNull`, `@Size`, `@Min`/`@Max`, `@DecimalMin`/`@DecimalMax`, `@Pattern`, `@Email`, `@Valid` cascade; Jakarta or Avaje style)
 - `readOnly`/`writeOnly` fields annotated for Avaje Jsonb (`@Json.Ignore`) or Jackson (`@JsonProperty`) via `jsonStyle` config

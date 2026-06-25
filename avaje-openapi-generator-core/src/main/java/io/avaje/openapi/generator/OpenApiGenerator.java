@@ -478,21 +478,18 @@ public final class OpenApiGenerator {
     var schema = parameter.getSchema();
     var type = context.javaType(schema);
     var javaName = variableName(name);
-    // avaje-http falls back to the Java parameter name when the annotation value is
-    // blank, so omit the value when the wire name already matches the parameter name
-    var omitValue = javaName.equals(name);
     var annotations = new ArrayList<String>();
     switch (in) {
       case "path":
         break;
       case "query":
-        annotations.add(paramAnnotation("QueryParam", name, omitValue));
+        annotations.add(paramAnnotation("QueryParam", name));
         break;
       case "header":
-        annotations.add(paramAnnotation("Header", name, omitValue));
+        annotations.add(paramAnnotation("Header", name));
         break;
       case "cookie":
-        annotations.add(paramAnnotation("Cookie", name, omitValue));
+        annotations.add(paramAnnotation("Cookie", name));
         break;
       default:
         context.unsupported("Unsupported parameter location '" + in + "' for parameter " + name);
@@ -513,14 +510,14 @@ public final class OpenApiGenerator {
   }
 
   /**
-   * Build an avaje-http parameter annotation, omitting the explicit name value when the
-   * wire name already matches the Java parameter name (avaje-http then falls back to the
-   * parameter name). For example {@code @QueryParam("status")} becomes {@code @QueryParam}.
+   * Build an avaje-http parameter annotation with an explicit wire-name value, for example
+   * {@code @QueryParam("status")}. The explicit name keeps the generated interface robust as
+   * a contract-first artifact consumed via {@code @Client.Import} from a precompiled jar,
+   * where Java parameter names are not available unless the consumer compiles with
+   * {@code -parameters}.
    */
-  private static String paramAnnotation(String simpleName, String wireName, boolean omitValue) {
-    return omitValue
-      ? "@" + simpleName
-      : "@" + simpleName + "(\"" + escape(wireName) + "\")";
+  private static String paramAnnotation(String simpleName, String wireName) {
+    return "@" + simpleName + "(\"" + escape(wireName) + "\")";
   }
 
   /**
