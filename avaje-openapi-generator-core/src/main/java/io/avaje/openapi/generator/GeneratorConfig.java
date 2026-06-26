@@ -66,8 +66,24 @@ public final class GeneratorConfig {
     this.dateTimeType = dateTimeType == null ? DateTimeType.OFFSET_DATE_TIME : dateTimeType;
     this.generateOverloads = generateOverloads;
     this.overloadPolicy = overloadPolicy == null ? OverloadPolicy.NULLABLE_ONLY : overloadPolicy;
-    this.nullableAnnotation = nullableAnnotation == null ? "" : nullableAnnotation.strip();
+    this.nullableAnnotation = normalizeNullableAnnotation(nullableAnnotation);
     this.typeMappings = typeMappings == null ? Map.of() : Map.copyOf(typeMappings);
+  }
+
+  /**
+   * Normalize the configured nullable annotation. A {@code null}, blank, or the
+   * case-insensitive sentinel {@code "NONE"} all disable {@code @Nullable} generation
+   * (normalized to an empty string). The {@code NONE} sentinel exists because build
+   * tools such as Maven collapse an empty configuration element to {@code null} and
+   * then apply the parameter default, making it impossible to disable generation by
+   * configuring a blank value.
+   */
+  private static String normalizeNullableAnnotation(String nullableAnnotation) {
+    if (nullableAnnotation == null) {
+      return "";
+    }
+    var trimmed = nullableAnnotation.strip();
+    return trimmed.equalsIgnoreCase("NONE") ? "" : trimmed;
   }
 
   public Path inputSpec() {

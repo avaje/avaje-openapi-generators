@@ -392,6 +392,34 @@ class OpenApiGeneratorTest {
   }
 
   @Test
+  void nullableAnnotationDisabledWithNoneSentinel() throws Exception {
+    var input = resourcePath("openapi/nullable.yaml");
+    // NONE (case-insensitive) disables @Nullable just like blank; it exists because
+    // Maven collapses an empty configuration element to the parameter default
+    var config = GeneratorConfig.builder(input, tempDir, "org.example.api")
+      .nullableAnnotation("NONE")
+      .build();
+
+    var result = new OpenApiGenerator().generate(config);
+
+    assertThat(result.diagnostics())
+      .filteredOn(it -> it.severity() == DiagnosticSeverity.ERROR)
+      .isEmpty();
+
+    assertThat(tempDir.resolve("org/example/api/ThingsApi.java"))
+      .content()
+      .doesNotContain("@Nullable")
+      .doesNotContain("org.jspecify")
+      .doesNotContain("NONE");
+
+    // with @Nullable disabled, a required+nullable field falls back to @NotNull
+    assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
+      .content()
+      .doesNotContain("@Nullable")
+      .contains("@NotNull String code");
+  }
+
+  @Test
   void nullableAnnotationCustomType() throws Exception {
     var input = resourcePath("openapi/nullable.yaml");
     var config = GeneratorConfig.builder(input, tempDir, "org.example.api")

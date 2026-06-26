@@ -110,8 +110,9 @@ public final class GenerateMojo extends AbstractMojo {
   /**
    * Fully-qualified {@code @Nullable} annotation applied to optional parameters and
    * {@code nullable: true} model fields. Defaults to
-   * {@code org.jspecify.annotations.Nullable}. Set to blank to disable {@code @Nullable}
-   * generation.
+   * {@code org.jspecify.annotations.Nullable}. Set to {@code NONE} to disable
+   * {@code @Nullable} generation entirely (an empty configuration element is collapsed
+   * to the default by Maven, so the {@code NONE} sentinel is used instead).
    */
   @Parameter(defaultValue = "org.jspecify.annotations.Nullable")
   private String nullableAnnotation;

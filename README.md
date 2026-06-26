@@ -388,11 +388,21 @@ depend on `avaje-http-api`, add it to the consuming project:
 ```
 
 Point it at a different annotation (for example `jakarta.annotation.Nullable`), or
-set it blank to disable `@Nullable` generation entirely:
+set it to `NONE` to disable `@Nullable` generation entirely:
 
 ```xml
-<nullableAnnotation></nullableAnnotation>
+<nullableAnnotation>NONE</nullableAnnotation>
 ```
+
+The `NONE` sentinel (case-insensitive) is used rather than an empty element because
+build tools such as Maven collapse an empty configuration element to `null` and then
+apply the parameter default, so a blank value cannot disable generation.
+
+Disabling `@Nullable` is also a way to keep contract-first server controllers working
+on avaje-http server generators **older than 3.10**: the JSpecify `@Nullable` is a
+`TYPE_USE` annotation that those generators fail to match between the interface
+method and the controller `@Override`, silently dropping the route. With `@Nullable`
+disabled the signatures match. See the contract-first guide for details.
 
 A field that is both `required` and `nullable: true` is annotated `@Nullable`
 (not `@NotNull`); with `@Nullable` disabled it falls back to `@NotNull`.
