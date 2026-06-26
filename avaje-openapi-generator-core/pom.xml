@@ -7,7 +7,7 @@
   <parent>
     <groupId>io.avaje</groupId>
     <artifactId>avaje-openapi-generators</artifactId>
-    <version>0.4</version>
+    <version>0.5</version>
   </parent>
 
   <artifactId>avaje-openapi-generator-core</artifactId>
