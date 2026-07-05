@@ -59,6 +59,15 @@ class OpenApiGeneratorTest {
       .contains("LocalDate birthDate")
       .contains("UUID externalId")
       .contains("Map<String, String> attributes");
+
+    // enum: never annotated with @Json — Avaje Jsonb handles plain enums natively
+    // via name()/valueOf(), and generating a dedicated adapter for them is both
+    // unnecessary and (for now) triggers a jsonb-generator bug for enum types.
+    assertThat(tempDir.resolve("org/example/api/model/PetStatus.java"))
+      .content()
+      .doesNotContain("@Json")
+      .doesNotContain("import io.avaje.jsonb.Json;")
+      .contains("public enum PetStatus {");
   }
 
   @Test

@@ -856,10 +856,7 @@ public final class OpenApiGenerator {
     if (enumDef.deprecated()) {
       source.body.append("@Deprecated\n");
     }
-    if (context.config.jsonAnnotations()) {
-      source.addImport("io.avaje.jsonb.Json");
-      source.body.append("@Json\n");
-    }
+    // No @Json annotation here for avaje-jsonb
     source.body.append("public enum ").append(enumDef.name()).append(" {\n");
     for (var i = 0; i < enumDef.values().size(); i++) {
       source.body.append("  ").append(enumDef.values().get(i).constant());
