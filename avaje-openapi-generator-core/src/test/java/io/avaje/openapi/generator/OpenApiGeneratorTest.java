@@ -36,7 +36,7 @@ class OpenApiGeneratorTest {
       .contains("List<Pet> listPets(@Nullable @QueryParam(\"limit\") Integer limit, @Nullable @QueryParam(\"status\") PetStatus status)")
       .contains("Stream<Pet> streamPets(@Nullable @QueryParam(\"status\") PetStatus status)")
       .contains("import java.util.stream.Stream;")
-      .contains("Pet getPet(Long id, @Nullable @Header(\"X-Request-Id\") String xRequestId, @QueryParam(\"useMaster\") @Default(\"false\") boolean useMaster)")
+      .contains("Pet getPet(long id, @Nullable @Header(\"X-Request-Id\") String xRequestId, @QueryParam(\"useMaster\") @Default(\"false\") boolean useMaster)")
       .contains("import io.avaje.http.api.Default;")
       .contains("import org.jspecify.annotations.Nullable;");
 
@@ -207,9 +207,9 @@ class OpenApiGeneratorTest {
       .contains("return streamPets(null);")
       // x-overload: true makes the defaulted useMaster droppable (passes its default);
       // x-overload: false on the header stops the trailing run, so only useMaster drops
-      .contains("default Pet getPet(Long id, String xRequestId) {")
+      .contains("default Pet getPet(long id, String xRequestId) {")
       .contains("return getPet(id, xRequestId, false);")
-      .doesNotContain("default Pet getPet(Long id) {");
+      .doesNotContain("default Pet getPet(long id) {");
   }
 
   @Test
@@ -362,7 +362,7 @@ class OpenApiGeneratorTest {
     assertThat(tempDir.resolve("org/example/api/ThingsApi.java"))
       .content()
       .contains("import org.jspecify.annotations.Nullable;")
-      .contains("Thing getThing(Long id, @Nullable @QueryParam(\"filter\") String filter, @QueryParam(\"page\") Integer page)");
+      .contains("Thing getThing(long id, @Nullable @QueryParam(\"filter\") String filter, @QueryParam(\"page\") Integer page)");
 
     // model: nullable:true field -> @Nullable; required+nullable suppresses @NotNull
     assertThat(tempDir.resolve("org/example/api/model/Thing.java"))
@@ -658,7 +658,7 @@ class OpenApiGeneratorTest {
       .contains("@apiNote Response headers: X-Rate-Limit (integer \u2014 Request limit per hour), X-Rate-Limit-Remaining (integer \u2014 Remaining requests in window), X-Rate-Limit-Reset (string)")
       // normal method structure preserved
       .contains("List<Item> listItems()")
-      .contains("Item getItem(Long id)")
+      .contains("Item getItem(long id)")
       // getItem has no response headers — @apiNote appears exactly once (for listItems)
       .containsOnlyOnce("@apiNote Response headers");
   }

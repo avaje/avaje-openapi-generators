@@ -29,7 +29,7 @@ public final class PetsController implements PetsApi {
   }
 
   @Override
-  public Pet getPet(Long id, boolean useMaster) {
+  public Pet getPet(long id, boolean useMaster) {
     return new Pet(id, "Dora", EPOCH);
   }
 }

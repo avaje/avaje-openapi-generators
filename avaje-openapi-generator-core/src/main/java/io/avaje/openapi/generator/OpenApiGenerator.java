@@ -496,10 +496,12 @@ public final class OpenApiGenerator {
         break;
     }
     var defaultValue = schema == null ? null : schema.getDefault();
+    if ("path".equals(in) || defaultValue != null) {
+      // Path parameters are required by the OpenAPI contract, so use the primitive form where applicable.
+      type = primitiveType(type);
+    }
     if (defaultValue != null) {
       annotations.add("@Default(\"" + escape(String.valueOf(defaultValue)) + "\")");
-      // a default guarantees a value, so use the primitive form where applicable
-      type = primitiveType(type);
     }
     var overloadDrop = overloadDrop(context, parameter, in, defaultValue);
     var dropValue = dropValue(type, defaultValue);
