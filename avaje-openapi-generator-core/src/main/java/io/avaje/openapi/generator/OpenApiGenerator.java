@@ -808,13 +808,13 @@ public final class OpenApiGenerator {
         if (context.config.jsonStyle() == JsonStyle.JACKSON) {
           source.body.append("@JsonProperty(access = JsonProperty.Access.READ_ONLY) ");
         } else {
-          source.body.append("@Json.Ignore(deserialize = true) ");
+          source.body.append("@Json.Ignore(serialize = true) ");
         }
       } else if (context.config.jsonAnnotations() && field.writeOnly()) {
         if (context.config.jsonStyle() == JsonStyle.JACKSON) {
           source.body.append("@JsonProperty(access = JsonProperty.Access.WRITE_ONLY) ");
         } else {
-          source.body.append("@Json.Ignore(serialize = true) ");
+          source.body.append("@Json.Ignore(deserialize = true) ");
         }
       }
       source.body.append(field.type().code()).append(' ').append(field.javaName());

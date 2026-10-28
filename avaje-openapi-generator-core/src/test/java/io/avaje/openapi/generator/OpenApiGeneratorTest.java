@@ -619,9 +619,9 @@ class OpenApiGeneratorTest {
       .content()
       .contains("@Json")
       .contains("import io.avaje.jsonb.Json;")
-      .contains("@Json.Ignore(deserialize = true) Long id")
+      .contains("@Json.Ignore(serialize = true) Long id")
       .contains("@NotNull String username")
-      .contains("@Json.Ignore(serialize = true) String password")
+      .contains("@Json.Ignore(deserialize = true) String password")
       .contains("@Nullable String email")
       .doesNotContain("JsonProperty");
   }

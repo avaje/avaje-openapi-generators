@@ -308,17 +308,17 @@ annotation so the serialisation library enforces the constraint:
 
 | OpenAPI | Avaje Jsonb (`jsonStyle: AVAJE`, default) | Jackson (`jsonStyle: JACKSON`) |
 | --- | --- | --- |
-| `readOnly: true` | `@Json.Ignore(deserialize = true)` | `@JsonProperty(access = JsonProperty.Access.READ_ONLY)` |
-| `writeOnly: true` | `@Json.Ignore(serialize = true)` | `@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)` |
+| `readOnly: true` | `@Json.Ignore(serialize = true)` | `@JsonProperty(access = JsonProperty.Access.READ_ONLY)` |
+| `writeOnly: true` | `@Json.Ignore(deserialize = true)` | `@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)` |
 
 The default style targets Avaje Jsonb:
 
 ```java
 @Json
 public record UserProfile(
-  @Json.Ignore(deserialize = true) Long id,        // readOnly — in responses only
+  @Json.Ignore(serialize = true) Long id,            // readOnly — in responses only
   @NotNull String username,
-  @Json.Ignore(serialize = true) String password,  // writeOnly — in requests only
+  @Json.Ignore(deserialize = true) String password,  // writeOnly — in requests only
   @Nullable String email
 ) {}
 ```
